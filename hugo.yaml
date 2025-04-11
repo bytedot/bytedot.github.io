@@ -1,4 +1,4 @@
-baseURL: "https://bytedot.github.io" # 主站的 URL
+baseURL: "https://bytedot.github.io/" # 主站的 URL
 title: 半丈天高 # 站点标题
 copyright: "[©2025 BZTG.ORG](https://bytedot.github.io/)" # 网站的版权声明，通常显示在页脚
 theme: PaperMod # 主题
