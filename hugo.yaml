@@ -1,0 +1,224 @@
+baseURL: "https://bytedot.github.io" # 主站的 URL
+title: 半丈天高 # 站点标题
+copyright: "[©2025 BZTG.ORG](https://bytedot.github.io/)" # 网站的版权声明，通常显示在页脚
+theme: PaperMod # 主题
+languageCode: zh-cn # 语言
+
+enableInlineShortcodes: true # shortcode，类似于模板变量，可以在写 markdown 的时候便捷地插入，官方文档中有一个视频讲的很通俗
+hasCJKLanguage: true # 是否有 CJK 的字符
+enableRobotsTXT: true # 允许生成 robots.txt
+buildDrafts: false # 构建时是否包括草稿
+buildFuture: false # 构建未来发布的内容
+buildExpired: false # 构建过期的内容
+enableEmoji: true # 允许 emoji
+pagination.pagerSize: 5 #5篇文章翻页
+pygmentsUseClasses: true
+defaultContentLanguage: zh # 顶部首先展示的语言界面
+defaultContentLanguageInSubdir: false # 是否要在地址栏加上默认的语言代码
+
+#配置导航栏
+languages:
+  zh:
+    languageName: "中文" # 展示的语言名
+    weight: 1 # 权重
+    taxonomies: # 分类系统
+      category: categories
+      tag: tags
+    # https://gohugo.io/content-management/menus/#define-in-site-configuration
+    menus:
+      main:
+        - name: 首页
+          pageRef: /
+          weight: 1 # 控制在页面上展示的前后顺序
+       # - name: 文章
+       #   pageRef: posts/
+       #   weight: 2
+        - name: 归档
+          pageRef: archives/
+          weight: 5
+        - name: 分类
+          pageRef: categories/
+          weight: 10
+        - name: 标签
+          pageRef: tags/
+          weight: 10
+        - name: 搜索
+          pageRef: search/
+          weight: 20
+        - name: 关于
+          pageRef: about/
+          weight: 21
+params:
+  env: production # to enable google analytics, opengraph, twitter-cards and schema.
+  title: ExampleSite
+  description: "ExampleSite description"
+  keywords: [Blog, Portfolio, PaperMod]
+  author: bztg
+  # author: ["Me", "You"] # multiple authors
+  images: ["<link or path of image for opengraph, twitter-cards>"]
+  DateFormat: "January 2, 2006"
+  # 默认主题
+  defaultTheme: auto # dark, light
+  # 是否禁用主题切换按钮
+  disableThemeToggle: false
+
+  # 是否启用阅读时间展示
+  ShowReadingTime: false
+  # 是都启用分享按钮
+  ShowShareButtons: false
+  ShowPostNavLinks: false
+  # 是否启用面包屑导航
+  ShowBreadCrumbs: true
+  # 是否显示代码复制按钮
+  ShowCodeCopyButtons: true
+  # 是否显示字数统计
+  ShowWordCount: false
+  # 是否在页面显示 RSS 按钮
+  ShowRssButtonInSectionTermList: true
+  UseHugoToc: true
+  disableSpecial1stPost: false
+  # 是否禁用首页滚动到顶部
+  disableScrollToTop: false
+  # 是否启用评论系统
+  comments: false
+  # 是否隐藏 Meta 信息
+  hidemeta: false
+  # 是否隐藏文章摘要
+  hideSummary: false
+  # 是否显示目录
+  showtoc: false
+  # 是否默认展开文章目录
+  tocopen: false
+    # 搜索
+  fuseOpts:
+      isCaseSensitive: false # 是否大小写敏感
+      shouldSort: true # 是否排序
+      location: 0
+      distance: 1000
+      threshold: 0.4
+      minMatchCharLength: 0
+      # limit: 10 # refer: https://www.fusejs.io/api/methods.html#search
+      keys: ["title", "permalink", "summary", "content"]
+      includeMatches: true
+
+  assets:
+    # disableHLJS: true # to disable highlight.js
+    # disableFingerprinting: true
+
+    # 网站 Favicon 图标相关信息
+    # 可在 https://realfavicongenerator.net/ 生成
+    # 将图片复制到 /static 目录下
+    # 然后修改下面代码中的文件名
+    favicon: "favicon-96x96.png"
+    favicon16x16: "favicon-96x96.png"
+    favicon32x32: "favicon-96x96.png"
+    apple_touch_icon: "apple-touch-icon.png"
+    safari_pinned_tab: "favicon-96x96.png"
+    disableHLJS: true # to disable highlight.js
+
+  label:
+    # 使用文本替代 Logo 标签
+    text: BZTG.ORG
+    # 网站 Logo 图片（/static 下面的文件名称）
+    icon: "favicon-96x96.png"
+    # 图标高度
+    iconHeight: 45
+
+  # 主页展示模式
+  # 个人信息模式
+  profileMode:
+    enabled: false # needs to be explicitly set
+    title: Welcome to my Blog
+    subtitle: ""
+    imageUrl: "blog.jpg"
+    imageWidth: 120
+    imageHeight: 120
+    imageTitle: my image
+    #buttons:
+    #  - name: 文章
+    #    url: posts/
+    #  - name: bilibili
+    #    url: X
+
+  # 主页 - 信息模式（默认）
+  homeInfoParams:
+    Title: "Do not go gentle into that good night"
+    Content: |
+      <div id="edt-clock"></div>
+      
+           Do not go gentle into that good night,
+           Old age should burn and rave at close of day;
+           Rage, rage against the dying of the light.
+           Though wise men at their end know dark is right,
+           Because their words had forked no lightning they
+           Do not go gentle into that good night.
+           Good men, the last wave by, crying how bright
+           Their frail deeds might have danced in a green bay,
+           Rage, rage against the dying of the light.
+           Wild men who caught and sang the sun in flight,
+           And learn, too late, they grieved it on its way,
+           Do not go gentle into that good night.
+           Grave men, near death, who see with blinding sight
+           Blind eyes could blaze like meteors and be gay,
+           Rage, rage against the dying of the light.
+           And you, my father, there on the sad height,
+           Curse, bless me now with your fierce tears, I pray.
+           Do not go gentle into that good night.
+           Rage, rage against the dying of the light.
+  #  主页 - 信息模式 图标展示
+  socialIcons:
+    - name: telegram
+      url: "https://t.me/zflbztg"
+    - name: steam
+      url: "https://steamcommunity.com/id/zflbztg"
+    - name: discord
+      url: "https://discord.gg/gspqZ6yzbB"      
+    - name: email
+      url: "mailto:hi@bztg.org"
+
+  analytics:
+    google:
+      SiteVerificationTag: "XYZabc"
+    bing:
+      SiteVerificationTag: "XYZabc"
+    yandex:
+      SiteVerificationTag: "XYZabc"
+
+  # 文章封面设置
+  cover:
+    hidden: true # hide everywhere but not in structured data
+    hiddenInList: true # hide on list pages and home
+    hiddenInSingle: true # hide on single page
+
+  # for search
+  # https://fusejs.io/api/options.html
+  fuseOpts:
+    isCaseSensitive: false
+    shouldSort: true
+    location: 0
+    distance: 1000
+    threshold: 0.4
+    minMatchCharLength: 0
+    limit: 10 # refer: https://www.fusejs.io/api/methods.html#search
+    keys: ["title", "permalink", "summary", "content"]
+pygmentsUseClasses: true
+markup:
+  goldmark:
+    renderer:
+      unsafe: true # 可以 unsafe，有些 html 标签和样式可能需要
+  highlight:
+    anchorLineNos: false # 不要给行号设置锚标
+    codeFences: true # 代码围栏
+    noClasses: false # TODO: 不知道干啥的，暂时没必要了解，不影响展示
+    lineNos: true # 代码行
+    lineNumbersInTable: false # 不要设置成 true，否则如果文章开头是代码的话，摘要会由一大堆数字(即代码行号)开头文章
+    # 这里设置 style 没用，得自己加 css
+    # style: "github-dark"
+    # style: monokai
+
+# https://github.com/adityatelange/hugo-PaperMod/wiki/Features#search-page
+outputs:
+  home:
+    - HTML # 生成的静态页面
+    - RSS # 这个其实无所谓
+    - JSON # necessary for search, 这里的配置修改好之后，一定要重新生成一下
