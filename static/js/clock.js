@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
       .find(part => part.type === 'timeZoneName').value.replace('GMT', 'UTC');
 
     clock.textContent =
-      `明尼阿波利斯 ${parts.timeZoneName} (${offset}): ` +
+      `${parts.timeZoneName} (${offset}): ` +
       `${parts.year}-${parts.month}-${parts.day} ${weekdays[parts.weekday]} ` +
       `${parts.hour}:${parts.minute}:${parts.second}`;
   }
