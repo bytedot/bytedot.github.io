@@ -144,7 +144,7 @@ params:
   homeInfoParams:
     Title: "Do not go gentle into that good night"
     Content: |
-      <div id="edt-clock"></div>
+      <div id="central-clock"></div>
       
            Do not go gentle into that good night,
            Old age should burn and rave at close of day;
