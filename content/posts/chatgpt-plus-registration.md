@@ -1,14 +1,16 @@
 ---
-title: "注册本站账户即赠送一个月ChatGPT Plus"
+title: "SuperGrok免费发放，数量有限送完为止"
+slug: "supergrok-giveaway"
+aliases: ["/posts/chatgpt-plus-registration/"]
 date: 2026-10-02T00:00:00-05:00
 draft: false
 author: "bztg"
 categories: ["BZTG.ORG"]
-tags: ["趣味演示"]
-summary: "本站账户注册演示入口，不提供真实账户或赠品。"
+tags: ["申请"]
+summary: "填写申请表单后，返回主页发送确认邮件，并注明用户名及9位数字标识。"
 ---
 
-**注册演示**：不创建账户、不发送邮件，也不赠送 ChatGPT Plus。请使用虚构信息。
+[申请表单填写]({{< ref "/register.md" >}})
 
-[注册入口]({{< ref "/register.md" >}})
+填写完成表单后返回主页点击邮件按钮，发送确认邮件，需包含表单中所填写的用户名和9位数字标识。
 

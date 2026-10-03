@@ -5,34 +5,43 @@
     <h1 class="post-title">{{ .Title }}</h1>
   </header>
 
-  <div class="registration-notice post-content">{{ .Content }}</div>
-
-  <form id="registration-form" class="registration-form" autocomplete="off" novalidate>
+  <form id="application-form" class="registration-form" autocomplete="off" novalidate>
     <div class="registration-field">
-      <label for="registration-username">用户名 <span class="registration-required">必填</span></label>
-      <input id="registration-username" type="text" placeholder="输入一个虚构的用户名" autocomplete="off" required aria-describedby="username-error username-loading">
+      <label for="application-username">用户名 <span class="registration-required">必填</span></label>
+      <input id="application-username" type="text" placeholder="请输入用户名" autocomplete="off" required aria-describedby="username-error username-loading">
       <p id="username-loading" class="registration-loading" role="status" hidden><span class="registration-spinner" aria-hidden="true"></span>正在检查用户名…</p>
       <p id="username-error" class="registration-error" aria-live="polite" hidden>用户名已被占用，请更换用户名。</p>
     </div>
 
     <div class="registration-field">
-      <label for="registration-email">邮箱地址 <span class="registration-required">必填</span></label>
-      <input id="registration-email" type="email" placeholder="例如 demo@example.com" autocomplete="off" required aria-describedby="email-error">
-      <p id="email-error" class="registration-error" aria-live="polite" hidden></p>
+      <label for="application-identifier">9位数字标识 <span class="registration-required">必填</span></label>
+      <input id="application-identifier" type="text" inputmode="numeric" pattern="[0-9]{9}" maxlength="9" placeholder="例如 012345678" autocomplete="off" required aria-describedby="identifier-help identifier-progress">
+      <p id="identifier-help" class="registration-help">请自行设置9位数字作为独特标识，支持以0开头。</p>
+      <p id="identifier-progress" class="registration-help" aria-live="polite">已输入 0 / 9 位</p>
     </div>
 
     <div class="registration-field">
-      <label for="registration-password">密码 <span class="registration-required">必填</span></label>
-      <input id="registration-password" type="password" placeholder="输入一个仅用于演示的密码" autocomplete="off" required aria-describedby="password-error password-loading">
-      <p id="password-loading" class="registration-loading" role="status" hidden><span class="registration-spinner" aria-hidden="true"></span>正在检查密码…</p>
-      <p id="password-error" class="registration-error" aria-live="polite" hidden>密码强度太弱，需要强密码。</p>
+      <label for="application-reason">申请理由</label>
+      <select id="application-reason">
+        <option value="">请选择申请理由</option>
+        <option value="work">工作</option>
+        <option value="study">学习</option>
+        <option value="interest">兴趣</option>
+        <option value="research">研究</option>
+        <option value="other">其他（请填写）</option>
+      </select>
     </div>
 
-    <button id="registration-submit" class="registration-submit" type="submit" disabled>注册账户</button>
-    <p id="registration-status" class="registration-status" role="status" hidden></p>
-    <noscript><p class="registration-error">请启用 JavaScript 后体验注册演示。此页面不会提交任何信息。</p></noscript>
+    <div id="application-other-field" class="registration-field" hidden>
+      <label for="application-other-reason">请填写其他申请理由</label>
+      <textarea id="application-other-reason" rows="3" maxlength="500" placeholder="请填写具体申请理由"></textarea>
+    </div>
+
+    <button id="application-submit" class="registration-submit" type="submit" disabled>提交申请</button>
+    <p id="application-status" class="registration-status" role="status" hidden></p>
+    <noscript><p class="registration-help">请启用 JavaScript 后填写申请表单。</p></noscript>
   </form>
 
-  <p class="registration-back"><a href="{{ "posts/chatgpt-plus-registration/" | relURL }}">返回文章</a></p>
+  <p class="registration-back"><a href="{{ "posts/supergrok-giveaway/" | relURL }}">返回文章</a></p>
 </article>
 {{- end }}

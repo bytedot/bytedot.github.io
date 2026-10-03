@@ -6,18 +6,6 @@
   --registration-error: #ff9b91;
 }
 
-.registration-notice {
-  padding: 16px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--code-bg);
-  font-size: 15px;
-}
-
-.registration-notice p:last-child {
-  margin-bottom: 0;
-}
-
 .registration-form {
   margin-top: 28px;
 }
@@ -41,7 +29,9 @@
   font-weight: 400;
 }
 
-.registration-field input {
+.registration-field input,
+.registration-field select,
+.registration-field textarea {
   display: block;
   width: 100%;
   min-width: 0;
@@ -58,11 +48,31 @@
   color: var(--secondary);
 }
 
+.registration-field textarea {
+  resize: vertical;
+}
+
+.registration-field textarea::placeholder {
+  color: var(--secondary);
+}
+
+.dark .registration-field select {
+  color-scheme: dark;
+}
+
+.registration-help {
+  margin-top: 8px;
+  color: var(--secondary);
+  font-size: 14px;
+}
+
 .registration-field input[aria-invalid="true"] {
   border-color: var(--registration-error);
 }
 
 .registration-field input:focus-visible,
+.registration-field select:focus-visible,
+.registration-field textarea:focus-visible,
 .registration-submit:focus-visible,
 .registration-back a:focus-visible {
   outline: 2px solid var(--primary);
