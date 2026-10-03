@@ -11,3 +11,10 @@
   }
 </style>
 {{ end }}
+{{ if eq .Layout "register" }}
+<meta http-equiv="Content-Security-Policy" content="form-action 'none'; connect-src 'none'">
+{{ $registrationCSS := resources.Get "css/register.css" | minify | fingerprint }}
+<link rel="stylesheet" href="{{ $registrationCSS.RelPermalink }}" integrity="{{ $registrationCSS.Data.Integrity }}">
+{{ $registrationJS := resources.Get "js/register.js" | minify | fingerprint }}
+<script defer src="{{ $registrationJS.RelPermalink }}" integrity="{{ $registrationJS.Data.Integrity }}"></script>
+{{ end }}

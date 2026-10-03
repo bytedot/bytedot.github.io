@@ -1,0 +1,116 @@
+.registration-page {
+  --registration-error: #b42318;
+}
+
+.dark .registration-page {
+  --registration-error: #ff9b91;
+}
+
+.registration-notice {
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--code-bg);
+  font-size: 15px;
+}
+
+.registration-notice p:last-child {
+  margin-bottom: 0;
+}
+
+.registration-form {
+  margin-top: 28px;
+}
+
+.registration-field {
+  margin-bottom: 24px;
+}
+
+.registration-field label {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.registration-required {
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.registration-field input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 13px 15px;
+  border: 1px solid var(--tertiary);
+  border-radius: var(--radius);
+  background: var(--theme);
+  color: var(--primary);
+  font: inherit;
+  font-size: 16px;
+}
+
+.registration-field input::placeholder {
+  color: var(--secondary);
+}
+
+.registration-field input[aria-invalid="true"] {
+  border-color: var(--registration-error);
+}
+
+.registration-field input:focus-visible,
+.registration-submit:focus-visible,
+.registration-back a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.registration-error {
+  margin-top: 8px;
+  color: var(--registration-error);
+  font-size: 14px;
+}
+
+.registration-submit {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--theme);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.registration-submit:hover {
+  opacity: 0.85;
+}
+
+.registration-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.registration-status {
+  margin-top: 16px;
+  color: var(--registration-error);
+  font-size: 15px;
+}
+
+.registration-back {
+  margin-top: 28px;
+  font-size: 15px;
+}
+
+.registration-back a {
+  border-bottom: 1px solid var(--secondary);
+}
+
+.registration-page [hidden] {
+  display: none !important;
+}

@@ -1,0 +1,37 @@
+{{- define "main" }}
+<article class="post-single registration-page">
+  <header class="post-header">
+    {{ partial "breadcrumbs.html" . }}
+    <h1 class="post-title">{{ .Title }}</h1>
+    <p class="post-description">填写以下信息，体验本站注册表单。</p>
+  </header>
+
+  <div class="registration-notice post-content">{{ .Content }}</div>
+
+  <form id="registration-form" class="registration-form" autocomplete="off" novalidate>
+    <div class="registration-field">
+      <label for="registration-username">用户名 <span class="registration-required">必填</span></label>
+      <input id="registration-username" type="text" placeholder="输入一个虚构的用户名" autocomplete="off" required aria-describedby="username-error">
+      <p id="username-error" class="registration-error" aria-live="polite" hidden>用户名已被占用，请更换用户名。</p>
+    </div>
+
+    <div class="registration-field">
+      <label for="registration-email">邮箱地址 <span class="registration-required">必填</span></label>
+      <input id="registration-email" type="email" placeholder="例如 demo@example.com" autocomplete="off" required aria-describedby="email-error">
+      <p id="email-error" class="registration-error" aria-live="polite" hidden></p>
+    </div>
+
+    <div class="registration-field">
+      <label for="registration-password">密码 <span class="registration-required">必填</span></label>
+      <input id="registration-password" type="password" placeholder="输入一个仅用于演示的密码" autocomplete="off" required aria-describedby="password-error">
+      <p id="password-error" class="registration-error" aria-live="polite" hidden>密码强度太弱，需要强密码。</p>
+    </div>
+
+    <button id="registration-submit" class="registration-submit" type="submit" disabled>注册账户</button>
+    <p id="registration-status" class="registration-status" role="status" hidden></p>
+    <noscript><p class="registration-error">请启用 JavaScript 后体验注册演示。此页面不会提交任何信息。</p></noscript>
+  </form>
+
+  <p class="registration-back"><a href="{{ "posts/chatgpt-plus-registration/" | relURL }}">返回文章</a></p>
+</article>
+{{- end }}
