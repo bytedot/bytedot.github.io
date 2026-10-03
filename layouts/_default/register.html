@@ -3,7 +3,6 @@
   <header class="post-header">
     {{ partial "breadcrumbs.html" . }}
     <h1 class="post-title">{{ .Title }}</h1>
-    <p class="post-description">填写以下信息，体验本站注册表单。</p>
   </header>
 
   <div class="registration-notice post-content">{{ .Content }}</div>
@@ -11,7 +10,8 @@
   <form id="registration-form" class="registration-form" autocomplete="off" novalidate>
     <div class="registration-field">
       <label for="registration-username">用户名 <span class="registration-required">必填</span></label>
-      <input id="registration-username" type="text" placeholder="输入一个虚构的用户名" autocomplete="off" required aria-describedby="username-error">
+      <input id="registration-username" type="text" placeholder="输入一个虚构的用户名" autocomplete="off" required aria-describedby="username-error username-loading">
+      <p id="username-loading" class="registration-loading" role="status" hidden><span class="registration-spinner" aria-hidden="true"></span>正在检查用户名…</p>
       <p id="username-error" class="registration-error" aria-live="polite" hidden>用户名已被占用，请更换用户名。</p>
     </div>
 
@@ -23,7 +23,8 @@
 
     <div class="registration-field">
       <label for="registration-password">密码 <span class="registration-required">必填</span></label>
-      <input id="registration-password" type="password" placeholder="输入一个仅用于演示的密码" autocomplete="off" required aria-describedby="password-error">
+      <input id="registration-password" type="password" placeholder="输入一个仅用于演示的密码" autocomplete="off" required aria-describedby="password-error password-loading">
+      <p id="password-loading" class="registration-loading" role="status" hidden><span class="registration-spinner" aria-hidden="true"></span>正在检查密码…</p>
       <p id="password-error" class="registration-error" aria-live="polite" hidden>密码强度太弱，需要强密码。</p>
     </div>
 

@@ -7,37 +7,81 @@
   const password = document.getElementById('registration-password');
   const status = document.getElementById('registration-status');
   const submit = document.getElementById('registration-submit');
+  const fields = [username, email, password];
+  const loading = [
+    document.getElementById('username-loading'),
+    document.getElementById('password-loading')
+  ];
+  let checking = false;
 
-  function rejectField(input, errorId) {
+  function showError(input, errorId, message) {
     input.setAttribute('aria-invalid', 'true');
-    document.getElementById(errorId).hidden = false;
+    const error = document.getElementById(errorId);
+    error.textContent = message;
+    error.hidden = false;
   }
 
-  function validateEmail() {
-    const error = document.getElementById('email-error');
-    const valid = email.validity.valid;
-    email.setAttribute('aria-invalid', String(!valid));
-    error.textContent = email.value.trim()
-      ? '请输入有效的邮箱地址。'
-      : '请输入邮箱地址。';
-    error.hidden = valid;
+  function clearErrors() {
+    for (const field of fields) field.removeAttribute('aria-invalid');
+    for (const id of ['username-error', 'email-error', 'password-error']) {
+      document.getElementById(id).hidden = true;
+    }
+    status.hidden = true;
+    status.textContent = '';
   }
 
-  for (const eventName of ['input', 'blur']) {
-    username.addEventListener(eventName, () => rejectField(username, 'username-error'));
-    password.addEventListener(eventName, () => rejectField(password, 'password-error'));
-    email.addEventListener(eventName, validateEmail);
+  function setChecking(value) {
+    checking = value;
+    form.setAttribute('aria-busy', String(value));
+    for (const field of fields) field.disabled = value;
+    for (const indicator of loading) indicator.hidden = !value;
+    submit.disabled = value;
+    submit.textContent = value ? '正在注册…' : '注册账户';
+    status.classList.toggle('is-checking', value);
+  }
+
+  for (const field of fields) {
+    field.addEventListener('input', () => {
+      if (!checking) clearErrors();
+    });
   }
 
   form.addEventListener('submit', event => {
-    // 趣味演示：仅更新页面提示，不发送、记录或保存任何输入。
+    // 本地演示：仅更新页面状态，不发送、记录或保存任何输入。
     event.preventDefault();
-    rejectField(username, 'username-error');
-    rejectField(password, 'password-error');
-    validateEmail();
-    status.textContent = '注册未完成：用户名已被占用，密码强度太弱，需要强密码。';
+    if (checking) return;
+    clearErrors();
+
+    let firstInvalid = null;
+    if (!username.value.trim()) {
+      showError(username, 'username-error', '请输入用户名。');
+      firstInvalid = username;
+    }
+    if (!email.validity.valid) {
+      showError(email, 'email-error', email.value.trim()
+        ? '请输入有效的邮箱地址。' : '请输入邮箱地址。');
+      firstInvalid = firstInvalid || email;
+    }
+    if (!password.value) {
+      showError(password, 'password-error', '请输入密码。');
+      firstInvalid = firstInvalid || password;
+    }
+    if (firstInvalid) {
+      firstInvalid.focus();
+      return;
+    }
+
+    setChecking(true);
+    status.textContent = '正在检查用户名和密码…';
     status.hidden = false;
-    username.focus();
+
+    setTimeout(() => {
+      setChecking(false);
+      showError(username, 'username-error', '用户名已被占用，请更换用户名。');
+      showError(password, 'password-error', '密码强度太弱，需要强密码。');
+      status.textContent = '注册未完成：用户名已被占用，密码强度太弱，需要强密码。';
+      username.focus();
+    }, 1600);
   });
 
   submit.disabled = false;

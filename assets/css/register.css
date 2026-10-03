@@ -75,6 +75,33 @@
   font-size: 14px;
 }
 
+.registration-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  color: var(--secondary);
+  font-size: 14px;
+}
+
+.registration-spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  border: 2px solid var(--tertiary);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: registration-spin 0.7s linear infinite;
+}
+
+@keyframes registration-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .registration-spinner { animation: none; }
+}
+
 .registration-submit {
   width: 100%;
   padding: 14px 20px;
@@ -100,6 +127,10 @@
   margin-top: 16px;
   color: var(--registration-error);
   font-size: 15px;
+}
+
+.registration-status.is-checking {
+  color: var(--secondary);
 }
 
 .registration-back {
