@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ZENITH 天顶</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700;800&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<!-- ===== 3D 画布容器 ===== -->
+<div id="app"></div>
+
+<!-- ===== HUD（游戏中显示） ===== -->
+<div id="hud" class="hidden">
+  <div id="reticle"></div>
+  <div id="banner"></div>
+  <div id="boundary">已接近城市边界</div>
+
+  <section id="gauge" aria-label="飞行仪表">
+    <div class="mode-row">
+      <span id="mode" class="chip">步行</span>
+      <span id="mach" class="mach">M 0.00</span>
+    </div>
+    <div class="speed-row">
+      <span id="speed" class="speed">0</span>
+      <span class="unit">KM/H</span>
+    </div>
+    <div class="bar" aria-hidden="true">
+      <div id="speedbar" class="bar-fill"></div>
+      <i class="tick" style="left:10.7%"></i>
+      <i class="tick" style="left:35.7%"></i>
+      <i class="tick tick-mach" style="left:81.7%"></i>
+    </div>
+    <div class="alt-row">
+      <span class="label">高度</span><span id="alt" class="alt">0</span><span class="label">M</span>
+      <span id="hyperTag" class="hyper-tag">⚡ 极速模式</span>
+    </div>
+  </section>
+
+  <section id="hints" aria-label="操作提示">
+    <div><kbd>W A S D</kbd><span>移动</span></div>
+    <div><kbd>鼠标</kbd><span>视角 / 飞行方向</span></div>
+    <div><kbd>Space</kbd><span>起飞 / 上升</span></div>
+    <div><kbd>Ctrl</kbd><kbd>C</kbd><span>下降</span></div>
+    <div><kbd>Shift</kbd><span>按住加速</span></div>
+    <div><kbd>Shift×2</kbd><span>极速（或长按）</span></div>
+    <div><kbd>X</kbd><span>紧急停止</span></div>
+    <div><kbd>左键</kbd><span>冲击拳</span></div>
+    <div><kbd>右键</kbd><span>目光射线</span></div>
+    <div><kbd>H</kbd><span>隐藏提示</span><kbd>M</kbd><span>静音</span></div>
+  </section>
+  <div id="fps"></div>
+</div>
+
+<!-- ===== 开始界面 ===== -->
+<div id="menu">
+  <div class="menu-inner">
+    <p class="eyebrow">超能飞行 · 城市破坏模拟</p>
+    <h1 class="title">ZENITH<span>天顶</span></h1>
+    <p class="lede">你是天顶。没有什么能挡住你。穿过整座城市，越过音障，让钢筋和玻璃为你让路。</p>
+    <button id="startBtn" class="start" disabled>正在生成城市…</button>
+    <div class="controls">
+      <div><kbd>W A S D</kbd><span>移动</span></div>
+      <div><kbd>鼠标</kbd><span>视角与飞行方向</span></div>
+      <div><kbd>Space</kbd><span>起飞 / 上升</span></div>
+      <div><kbd>Ctrl</kbd> / <kbd>C</kbd><span>下降</span></div>
+      <div><kbd>Shift</kbd><span>按住高速飞行</span></div>
+      <div><kbd>双击 Shift</kbd><span>极速冲刺（或长按 1 秒）</span></div>
+      <div><kbd>X</kbd><span>紧急停止</span></div>
+      <div><kbd>左键 / 右键</kbd><span>冲击拳 / 目光射线</span></div>
+    </div>
+    <p class="note">提示：浏览器里 Ctrl+W 会关闭标签页，下降时更推荐用 <kbd>C</kbd>。从高空高速俯冲撞向地面会引发巨大冲击。</p>
+  </div>
+</div>
+
+<!-- ===== 暂停界面 ===== -->
+<div id="pause" class="hidden">
+  <div class="pause-card">
+    <h2>已暂停</h2>
+    <p>点击下方按钮返回城市上空。</p>
+    <button id="resumeBtn" class="start">继续游戏</button>
+  </div>
+</div>
+
+<div id="fatal" class="hidden"></div>
+
+<!-- Three.js r159 UMD（cdnjs 主源，jsDelivr 备用） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.159.0/three.min.js"></script>
+<script>window.THREE || document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.159.0/build/three.min.js"><\/script>');</script>
+
+<!-- 游戏模块（普通脚本，按依赖顺序加载，可直接双击 index.html 运行） -->
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/environment.js"></script>
+<script src="js/buildingMaterial.js"></script>
+<script src="js/particles.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/city.js"></script>
+<script src="js/props.js"></script>
+<script src="js/destruction.js"></script>
+<script src="js/hero.js"></script>
+<script src="js/controller.js"></script>
+<script src="js/camera.js"></script>
+<script src="js/postfx.js"></script>
+<script src="js/hud.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
