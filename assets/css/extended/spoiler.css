@@ -1,0 +1,14 @@
+.post-content .spoiler {
+  background-color: #000;
+  color: transparent;
+  border-radius: 2px;
+  padding: 0.08em 0.3em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  cursor: help;
+}
+
+.post-content .spoiler:hover,
+.post-content .spoiler:focus {
+  color: #fff;
+}
