@@ -13,4 +13,4 @@ summary: "6.1 Sol 和 Sonnet 5.5，GPT…拉完了。。都是相同提示词直
 
 <span class="spoiler" tabindex="0">不过其实Sonnet 5.5的写完有个bug，用Astra修了一下hhhh</span>
 
-又让<a href="https://bztg.org/vcw/261015-opus55/" target="_blank" rel="noopener noreferrer">Opus 5.5</a>做了一份，但只用了Sonnet 5.5那份的不到六分之一的token，感觉在敷衍我……
+又让<a href="https://bztg.org/vcw/261015-opus55/" target="_blank" rel="noopener noreferrer">Opus 5.5</a>做了一份，就也还行吧
