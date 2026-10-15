@@ -1,0 +1,2074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ship in a Bottle — Voxel Diorama</title>
+<style>
+  :root { color-scheme: dark; --panel: rgba(18, 22, 34, 0.62); --line: rgba(255, 236, 200, 0.16); --ink: #f3ead8; --dim: #b9ae98; --gold: #e8b860; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #07080d; color: var(--ink);
+    font-family: ui-serif, Georgia, "Times New Roman", serif; }
+  canvas { display: block; touch-action: none; outline: none; }
+  #title { position: fixed; top: 16px; left: 20px; pointer-events: none; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+  #title h1 { margin: 0; font-size: 26px; letter-spacing: .06em; font-weight: 600; color: var(--gold); }
+  #title p { margin: 4px 0 0; font: 13px/1.4 ui-sans-serif, system-ui, "Segoe UI", sans-serif; color: #efe4cc; text-shadow: 0 1px 3px rgba(0,0,0,.9), 0 0 14px rgba(0,0,0,.6); }
+  #hud { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; flex-wrap: wrap; gap: 8px;
+    align-items: center; justify-content: center; padding: 10px 12px; max-width: calc(100vw - 32px); box-sizing: border-box;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px); font: 13px ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
+  .btn { appearance: none; border: 1px solid var(--line); background: rgba(255,255,255,.04); color: var(--ink);
+    padding: 7px 12px; border-radius: 9px; cursor: pointer; font: inherit; transition: background .15s, border-color .15s; white-space: nowrap; }
+  .btn:hover { background: rgba(255,255,255,.1); }
+  .btn.on { background: rgba(232,184,96,.22); border-color: rgba(232,184,96,.65); color: #fff4dc; }
+  #hud label { display: flex; align-items: center; gap: 8px; color: var(--dim); padding: 0 4px; }
+  #tod { width: 120px; accent-color: var(--gold); }
+  #clock { min-width: 44px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  #help { position: fixed; top: 14px; right: 16px; font: 12px/1.6 ui-sans-serif, system-ui, "Segoe UI", sans-serif; color: #d8ccb4;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    text-align: right; pointer-events: none; text-shadow: 0 1px 8px rgba(0,0,0,.7); }
+  #help b { color: var(--ink); font-weight: 600; }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(circle at 50% 45%, #1b2233, #07080d 70%);
+    z-index: 10; transition: opacity .8s; font-size: 18px; letter-spacing: .08em; color: var(--gold); }
+  #loading small { display: block; margin-top: 10px; font: 12px ui-sans-serif, system-ui, sans-serif; color: var(--dim); letter-spacing: 0; text-align: center; }
+  #loading.done { opacity: 0; pointer-events: none; }
+  @media (max-width: 640px) { #help { display: none; } #title h1 { font-size: 20px; } #tod { width: 90px; } }
+</style>
+</head>
+<body>
+<div id="loading"><div>Rigging the ship &amp; filling the bottle…<small id="loadmsg">loading three.js</small></div></div>
+<div id="title"><h1>Ship in a Bottle</h1><p>A voxel world adrift in glass</p></div>
+<div id="help">
+  <div><b>Drag</b> orbit · <b>Wheel</b> zoom</div>
+  <div><b>Right-drag</b> tilt the bottle · <b>Click</b> the sea to drop cargo</div>
+  <div><b>S</b> storm · <b>K</b> shake · <b>N</b> day/night · <b>F</b> follow ship</div>
+</div>
+<div id="hud">
+  <button class="btn" id="bStorm">Storm</button>
+  <button class="btn" id="bShake">Shake bottle</button>
+  <button class="btn" id="bRock">Rock gently</button>
+  <button class="btn on" id="bCycle">Day cycle</button>
+  <label>Time <input id="tod" type="range" min="0" max="1" step="0.001" value="0.36" /><span id="clock">08:38</span></label>
+  <button class="btn" id="bFollow">Follow ship</button>
+  <button class="btn" id="bOrbit">Auto orbit</button>
+  <button class="btn" id="bSound">Sound off</button>
+</div>
+<script>
+  window.addEventListener('error', (e) => {
+    const m = document.getElementById('loadmsg');
+    if (m) m.textContent = 'Error: ' + (e.message || e.error);
+  });
+</script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+document.getElementById('loadmsg').textContent = 'building voxels';
+
+// =====================================================================
+//  CORE: math, noise, colour helpers, voxel mesher, renderer, materials
+// =====================================================================
+const TAU = Math.PI * 2;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (t) => t * t * (3 - 2 * t);
+const sstep = (a, b, x) => smooth(clamp((x - a) / (b - a), 0, 1));
+function mulberry32(a) {
+  return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+const rand = mulberry32(20261015);
+const rr = (a, b) => a + (b - a) * rand();
+const ri = (a, b) => Math.floor(a + (b - a + 1) * rand());
+const pick = (arr) => arr[Math.floor(rand() * arr.length)];
+function hash2(x, y) {
+  let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+const hash3 = (x, y, z) => hash2((x | 0) + Math.imul(z | 0, 1013904223), (y | 0) ^ Math.imul(z | 0, 1664525));
+function noise2(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), u = smooth(x - xi), v = smooth(y - yi);
+  return lerp(lerp(hash2(xi, yi), hash2(xi + 1, yi), u), lerp(hash2(xi, yi + 1), hash2(xi + 1, yi + 1), u), v);
+}
+function fbm2(x, y, o = 4) {
+  let s = 0, a = 0.5, n = 0;
+  for (let i = 0; i < o; i++) { s += a * noise2(x, y); n += a; x = x * 2.03 + 17.1; y = y * 2.03 - 9.7; a *= 0.5; }
+  return s / n;
+}
+// colours are packed 0xRRGGBB ints (sRGB); converted to linear when meshed
+const S2L = new Float32Array(256);
+for (let i = 0; i < 256; i++) { const c = i / 255; S2L[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+function shade(c, f) {
+  const r = Math.min(255, ((c >> 16) & 255) * f) | 0, g = Math.min(255, ((c >> 8) & 255) * f) | 0, b = Math.min(255, (c & 255) * f) | 0;
+  return (r << 16) | (g << 8) | b;
+}
+function mixc(a, b, t) {
+  return ((lerp((a >> 16) & 255, (b >> 16) & 255, t) | 0) << 16) | ((lerp((a >> 8) & 255, (b >> 8) & 255, t) | 0) << 8) | (lerp(a & 255, b & 255, t) | 0);
+}
+const vary = (c, amt = 0.07) => shade(c, 1 + (rand() * 2 - 1) * amt);
+
+// ---------------------------------------------------------------------
+//  Bottle geometry constants (bottle-local space; bottle axis = +X)
+// ---------------------------------------------------------------------
+const R_IN = 7.0, R_OUT = 7.28, WL = -1.5, Y_BODY = WL - 0.9;
+const X_BASE = -15.6, X_SH = 11.0, X_NECK = 15.0, R_NECK = 2.1, X_LIP = 19.7;
+function innerR(x) {
+  if (x <= X_SH) return R_IN;
+  if (x >= X_NECK) return R_NECK;
+  const t = (x - X_SH) / (X_NECK - X_SH);
+  return R_NECK + (R_IN - R_NECK) * (0.5 + 0.5 * Math.cos(Math.PI * t));
+}
+const insideBottle = (x, y, z, m = 0) => x > X_BASE + 0.3 + m && x < X_LIP && Math.hypot(y, z) < innerR(x) - m;
+
+// ---------------------------------------------------------------------
+//  Voxel model + mesher (hidden-face culling, per-vertex ambient occlusion)
+// ---------------------------------------------------------------------
+const KX = 1024; // keys stay below 2^30 so V8 keeps them as small ints
+const vkey = (x, y, z) => ((x + 512) * KX + (y + 512)) * KX + (z + 512);
+const AO_F = [0.52, 0.7, 0.86, 1.0];
+class VoxelModel {
+  constructor() { this.map = new Map(); }
+  set(x, y, z, c) { this.map.set(vkey(x, y, z), c); }
+  get(x, y, z) { return this.map.get(vkey(x, y, z)); }
+  has(x, y, z) { return this.map.has(vkey(x, y, z)); }
+  del(x, y, z) { this.map.delete(vkey(x, y, z)); }
+  box(x0, y0, z0, x1, y1, z1, c) {
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++)
+      this.set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
+  }
+  ball(cx, cy, cz, r, c, sy = 1) {
+    const R = Math.ceil(r);
+    for (let x = -R; x <= R; x++) for (let y = -R; y <= R; y++) for (let z = -R; z <= R; z++)
+      if (x * x + (y * y) / (sy * sy) + z * z <= r * r) this.set(cx + x, cy + y, cz + z, typeof c === 'function' ? c(cx + x, cy + y, cz + z) : c);
+  }
+  line(x0, y0, z0, x1, y1, z1, c, th = 0) {
+    const n = Math.max(1, Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), Math.abs(z1 - z0))));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, x = Math.round(lerp(x0, x1, t)), y = Math.round(lerp(y0, y1, t)), z = Math.round(lerp(z0, z1, t));
+      if (th) this.box(x, y, z, x + th, y + th, z + th, c); else this.set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
+    }
+  }
+  // builds an indexed BufferGeometry of exposed faces; size = voxel edge, off = voxel-space offset
+  geometry(size = 0.1, off = [0, 0, 0]) {
+    const map = this.map, has = (x, y, z) => map.has(vkey(x, y, z));
+    const pos = [], nor = [], col = [], idx = [];
+    const v = [0, 0, 0], p = [0, 0, 0], q = [0, 0, 0], ao = [0, 0, 0, 0], ord = [0, 0, 0, 0], e = [0, 0, 0, 0];
+    let vi = 0;
+    for (const [k, c] of map) {
+      v[2] = (k % KX) - 512; const t = Math.floor(k / KX); v[1] = (t % KX) - 512; v[0] = Math.floor(t / KX) - 512;
+      const cr = S2L[(c >> 16) & 255], cg = S2L[(c >> 8) & 255], cb = S2L[c & 255];
+      for (let a = 0; a < 3; a++) {
+        const u = (a + 1) % 3, w = (a + 2) % 3;
+        for (let s = -1; s <= 1; s += 2) {
+          p[0] = v[0]; p[1] = v[1]; p[2] = v[2]; p[a] += s;
+          if (has(p[0], p[1], p[2])) continue;
+          for (let ci = 0; ci < 4; ci++) {
+            const du = (ci === 1 || ci === 2) ? 1 : -1, dw = ci >= 2 ? 1 : -1;
+            q[0] = p[0]; q[1] = p[1]; q[2] = p[2]; q[u] += du; const s1 = has(q[0], q[1], q[2]) ? 1 : 0;
+            q[u] -= du; q[w] += dw; const s2 = has(q[0], q[1], q[2]) ? 1 : 0;
+            q[u] += du; const cc = has(q[0], q[1], q[2]) ? 1 : 0;
+            ao[ci] = s1 && s2 ? 0 : 3 - (s1 + s2 + cc);
+          }
+          if (s > 0) { ord[0] = 0; ord[1] = 1; ord[2] = 2; ord[3] = 3; } else { ord[0] = 0; ord[1] = 3; ord[2] = 2; ord[3] = 1; }
+          for (let j = 0; j < 4; j++) {
+            const cn = ord[j], cu = (cn === 1 || cn === 2) ? 1 : 0, cw = cn >= 2 ? 1 : 0;
+            q[a] = v[a] + (s > 0 ? 1 : 0); q[u] = v[u] + cu; q[w] = v[w] + cw;
+            pos.push((q[0] + off[0]) * size, (q[1] + off[1]) * size, (q[2] + off[2]) * size);
+            nor.push(a === 0 ? s : 0, a === 1 ? s : 0, a === 2 ? s : 0);
+            const f = AO_F[ao[cn]]; e[j] = ao[cn];
+            col.push(cr * f, cg * f, cb * f);
+          }
+          if (e[0] + e[2] >= e[1] + e[3]) idx.push(vi, vi + 1, vi + 2, vi, vi + 2, vi + 3);
+          else idx.push(vi + 1, vi + 2, vi + 3, vi + 1, vi + 3, vi);
+          vi += 4;
+        }
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(vi > 65535 ? new THREE.Uint32BufferAttribute(idx, 1) : new THREE.Uint16BufferAttribute(idx, 1));
+    g.computeBoundingSphere();
+    return g;
+  }
+}
+
+// ---------------------------------------------------------------------
+//  Renderer, scene, camera, post-processing
+// ---------------------------------------------------------------------
+let PR = Math.min(window.devicePixelRatio || 1, 1.75);
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(PR);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 500);
+camera.position.set(-5, 8, 38);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(2, -1.2, 0);
+controls.enableDamping = true; controls.dampingFactor = 0.07;
+controls.enablePan = false;
+controls.minDistance = 7; controls.maxDistance = 80;
+controls.maxPolarAngle = Math.PI * 0.64;
+controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: null };
+
+const composerRT = new THREE.WebGLRenderTarget(innerWidth * PR, innerHeight * PR, { type: THREE.HalfFloatType, samples: 4 });
+const composer = new EffectComposer(renderer, composerRT);
+composer.setPixelRatio(PR);
+composer.setSize(innerWidth, innerHeight);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.55, 0.88);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+// everything inside (and including) the bottle lives in this group, so the bottle can be tilted as one
+const bottle = new THREE.Group();
+scene.add(bottle);
+
+// ---------------------------------------------------------------------
+//  Shared uniforms + materials (inside-bottle material gets caustics + depth tint)
+// ---------------------------------------------------------------------
+const U = {
+  uTime: { value: 0 }, uWL: { value: WL }, uSlope: { value: new THREE.Vector3(0, 0, -2.2) },
+  uBInv: { value: new THREE.Matrix4() }, uDay: { value: 1 }, uCaus: { value: 1 },
+  uDeep: { value: new THREE.Color(0x0b5170) }, uFlash: { value: 0 },
+};
+const CAUSTIC_GLSL = `
+vec2 cH(vec2 p){ p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3))); return fract(sin(p) * 43758.5453); }
+float cVor(vec2 p, float t){
+  vec2 ip = floor(p), fp = fract(p); float d1 = 8.0, d2 = 8.0;
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 g = vec2(float(x), float(y)); vec2 o = cH(ip + g);
+    o = 0.5 + 0.42 * sin(t + 6.2831 * o);
+    float d = length(g + o - fp);
+    if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+  }
+  return 1.0 - smoothstep(0.0, 0.16, d2 - d1);
+}
+float caustic(vec2 p, float t){
+  p += 0.3 * vec2(sin(p.y * 1.7 + t * 0.6), cos(p.x * 1.3 - t * 0.5));
+  return pow(cVor(p, t * 0.9), 2.0) * 0.6 + pow(cVor(p * 1.8 + 3.7, t * 1.25), 2.0) * 0.4;
+}`;
+function insideMaterial(params = {}) {
+  const m = new THREE.MeshStandardMaterial(Object.assign({ vertexColors: true, roughness: 0.86, metalness: 0 }, params));
+  m.onBeforeCompile = (sh) => {
+    for (const k of ['uTime', 'uWL', 'uSlope', 'uBInv', 'uDay', 'uCaus', 'uDeep']) sh.uniforms[k] = U[k];
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform mat4 uBInv;\nvarying vec3 vBL;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vec4 blp = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          blp = instanceMatrix * blp;
+        #endif
+        vBL = (uBInv * modelMatrix * blp).xyz;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime, uWL, uDay, uCaus;\nuniform vec3 uSlope, uDeep;\nvarying vec3 vBL;\n' + CAUSTIC_GLSL)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        {
+          float wl = uWL + uSlope.x * (vBL.x - uSlope.z) + uSlope.y * vBL.z;
+          float dep = wl - vBL.y;
+          if (dep > 0.0 && length(vBL.yz) < 7.05) {
+            vec3 fn = normalize(cross(dFdx(vBL), dFdy(vBL)));
+            float up = clamp(abs(fn.y), 0.0, 1.0) * 0.8 + 0.2;
+            float c = caustic(vBL.xz * 1.15, uTime * 1.2) * up * uCaus * exp(-dep * 0.28);
+            diffuseColor.rgb = diffuseColor.rgb * (1.0 + c * 1.3) + vec3(0.25, 0.45, 0.5) * c * 0.25;
+            diffuseColor.rgb = mix(diffuseColor.rgb, uDeep, clamp(0.04 + dep * 0.06, 0.0, 0.42));
+          }
+        }`);
+  };
+  return m;
+}
+const voxMat = insideMaterial();
+const voxMatOut = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0 });
+const glowMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+glowMat.userData.base = 1;
+
+function voxMesh(model, size, mat = voxMat, off = [0, 0, 0], shadow = true) {
+  const mesh = new THREE.Mesh(model.geometry(size, off), mat);
+  mesh.castShadow = shadow; mesh.receiveShadow = shadow;
+  return mesh;
+}
+
+// =====================================================================
+//  TERRAIN: sea floor, central island, volcano islet, sea arch, headland
+// =====================================================================
+const ISL = { x: -4.0, z: 0.0, ax: 3.9, az: 2.5 };     // tropical island (ellipse at waterline)
+const VOL = { x: -13.8, z: 5.1 };                      // little volcano
+const ARCH = { x: 6.1, z: 4.9 };                       // sea arch
+const LH = { x: 11.7, z: 0.0 };                        // lighthouse on the headland
+const REEFS = [{ x: -11.8, z: -3.6, r: 1.7, h: 1.3 }, { x: 2.6, z: -4.4, r: 1.4, h: 1.1 }, { x: -6.5, z: 4.1, r: 1.2, h: 0.8 }, { x: -1.0, z: -4.9, r: 1.0, h: 0.7 }];
+const SEABED = WL - 3.7;
+
+function islandProfile(r) {              // height above waterline, r = normalised elliptic radius
+  if (r < 0.38) return 1.5 + 0.7 * (1 - r / 0.38);
+  if (r < 0.75) return lerp(1.5, 0.45, (r - 0.38) / 0.37);
+  if (r < 1.0) return lerp(0.45, -0.08, (r - 0.75) / 0.25);
+  if (r < 1.4) return lerp(-0.08, -1.15, smooth((r - 1.0) / 0.4));
+  if (r < 2.1) return lerp(-1.15, -3.9, smooth((r - 1.4) / 0.7));
+  return -3.9;
+}
+function terrainH(x, z) {
+  const n = fbm2(x * 0.33 + 3.1, z * 0.33 - 1.7, 3);
+  let h = SEABED + (n - 0.5) * 0.8 + 0.22 * Math.sin(x * 0.55 + 1.3) * Math.cos(z * 0.6);
+  // island
+  const ix = (x - ISL.x) / ISL.ax, iz = (z - ISL.z) / ISL.az;
+  const r = Math.hypot(ix, iz) * (1 + (n - 0.5) * 0.22);
+  h = Math.max(h, WL + islandProfile(r) + (r < 0.8 ? (n - 0.5) * 0.35 : 0));
+  // volcano cone with crater
+  const dv = Math.hypot(x - VOL.x, z - VOL.z);
+  let vh = WL + 3.1 - dv * 2.0;
+  if (dv < 0.5) vh = WL + 2.1 - (0.5 - dv) * 1.6;
+  h = Math.max(h, vh + (dv > 0.5 ? (n - 0.5) * 0.35 : 0));
+  // sea arch pillars on a rocky base
+  for (const s of [-1, 1]) {
+    const dp = Math.hypot(x - (ARCH.x + s * 0.8), z - ARCH.z);
+    if (dp < 0.5) h = Math.max(h, WL + 2.0 + (n - 0.5) * 0.3);
+  }
+  const da = Math.hypot((x - ARCH.x) / 1.6, (z - ARCH.z) / 1.0);
+  if (da < 1.6) h = Math.max(h, WL - 0.35 - da * 1.6 + (n - 0.5) * 0.5);
+  // reefs
+  for (const f of REEFS) { const d = Math.hypot(x - f.x, z - f.z) / f.r; if (d < 1) h = Math.max(h, SEABED + f.h * (1 - d * d) + (n - 0.5) * 0.4); }
+  // headland under the bottle shoulder
+  const hx = sstep(7.3, 9.1, x + (n - 0.5) * 1.1);
+  if (hx > 0) h = Math.max(h, lerp(h, WL + 1.25 + (n - 0.5) * 0.45 + sstep(9.5, 13.5, x) * 0.45, hx));
+  return h;
+}
+// sea floor height including the curved glass underneath
+function floorAt(x, z) {
+  const R = innerR(x) - 0.1, g = Math.abs(z) < R ? -Math.sqrt(R * R - z * z) : 0;
+  return Math.max(terrainH(x, z), g);
+}
+
+// ---------------------------------------------------------------------
+//  Terrain voxel mesh — stratified so the glass shows a cross-section
+// ---------------------------------------------------------------------
+function buildTerrain() {
+  const S = 0.2, m = new VoxelModel();
+  const glow = new VoxelModel();
+  const i0 = Math.floor((X_BASE + 0.32) / S), i1 = Math.floor(X_NECK / S);
+  const GRASS = [0x5fa83c, 0x4f9a36, 0x6cb544, 0x7fbf4a, 0x4a8c33];
+  for (let i = i0; i <= i1; i++) {
+    const cx = (i + 0.5) * S, R = innerR(cx) - 0.14;
+    for (let k = -36; k < 36; k++) {
+      const cz = (k + 0.5) * S;
+      if (Math.abs(cz) > R - 0.05) continue;
+      const half = Math.sqrt(R * R - cz * cz);
+      let top = Math.min(terrainH(cx, cz), half - 0.25);
+      if (top < -half + 0.1) continue;
+      const jTop = Math.floor(top / S), jBot = Math.ceil(-half / S);
+      const slope = Math.abs(terrainH(cx + S, cz) - terrainH(cx - S, cz)) + Math.abs(terrainH(cx, cz + S) - terrainH(cx, cz - S));
+      const dv = Math.hypot(cx - VOL.x, cz - VOL.z), da = Math.hypot(cx - ARCH.x, cz - ARCH.z);
+      const nn = noise2(cx * 1.7, cz * 1.7), band = noise2(cx * 0.4 + 9, cz * 0.4) * 0.6;
+      for (let j = jTop; j >= jBot; j--) {
+        const y = (j + 0.5) * S, d = top - y;
+        let c;
+        if (dv < 2.3 && y > SEABED - 0.6) {                                   // volcano basalt + ash
+          c = d < 0.25 ? (dv < 0.75 ? 0x6b3a2e : (hash3(i, j, k) < 0.25 ? 0x5a4a48 : 0x3c3438)) : 0x2f292c;
+          if (dv < 0.42 && d < 0.25) { glow.set(i, j, k, hash3(i, j, k) < 0.5 ? 0xff6a1a : 0xffb030); continue; }
+        } else if (da < 1.7 && y > WL - 1.2) {                               // sandstone arch base
+          c = ((j + Math.floor(band * 4)) % 3 === 0) ? 0xb48a60 : 0x9c7552;
+        } else if (top > WL + 0.32) {                                        // dry land
+          if (d < 0.2) {
+            if (slope > 0.75) c = hash3(i, j, k) < 0.5 ? 0x8a837a : 0x77716a;
+            else if (cx > 7.6 && nn > 0.72) c = 0x9a948a;
+            else c = GRASS[Math.floor(nn * 4.99)];
+          } else if (d < 0.6) c = slope > 0.75 ? 0x6f6962 : 0x7a5434;
+          else c = cx > 7.3 ? ((j % 2) ? 0x75706a : 0x68635e) : 0x6e665e;
+        } else if (top > WL - 0.28) {                                        // beach
+          c = d < 0.2 ? (top < WL + 0.05 ? 0xcdb27a : 0xf0dca6) : 0xd8bf86;
+        } else {                                                              // sea floor + strata
+          if (d < 0.2) {
+            const hsh = hash3(i, j, k);
+            c = hsh < 0.04 ? 0x6e8f4a : hsh < 0.08 ? 0xa89b8a : (top > WL - 1.4 ? 0xe6d3a0 : 0xd4bd8a);
+          } else {
+            const b = d + band;
+            c = b < 0.6 ? 0xc9b07c : b < 1.0 ? 0xb39466 : b < 1.35 ? 0x9b7653 : b < 1.6 ? 0xc2a676 : 0x6e665e;
+          }
+        }
+        m.set(i, j, k, vary(c, 0.06));
+      }
+    }
+  }
+  const mesh = voxMesh(m, S);
+  mesh.name = 'terrain';
+  bottle.add(mesh);
+  const g = voxMesh(glow, S, glowMat, [0, 0, 0], false);
+  bottle.add(g);
+  return mesh;
+}
+document.getElementById('loadmsg').textContent = 'shaping the sea floor';
+buildTerrain();
+
+// =====================================================================
+//  OCEAN — voxel water columns driven by three layers of physics:
+//   1) analytic swell (deep-water dispersion ω = √(gk), scaled for the miniature)
+//   2) a 2-D wave-equation ripple field (wakes, splashes, rain, clicks)
+//   3) a damped first-mode slosh of the whole surface when the bottle tilts
+// =====================================================================
+U.uSky = { value: new THREE.Color(0x9fc8e8) };
+const ocean = (() => {
+  const C = 0.2, x0 = -15.15, x1 = 10.9, zM = 7.0;
+  const nx = Math.ceil((x1 - x0) / C), nz = Math.ceil((2 * zM) / C), N = nx * nz;
+  const cx = new Float32Array(N), cz = new Float32Array(N), floor = new Float32Array(N), shallow = new Float32Array(N), cvar = new Float32Array(N);
+  const wet = new Uint8Array(N), nb = new Int32Array(N * 4);
+  let rip = new Float32Array(N), ripP = new Float32Array(N);
+  const foam = new Float32Array(N), h = new Float32Array(N);
+  const W = [];
+  for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
+    const id = k * nx + i, x = x0 + (i + 0.5) * C, z = -zM + (k + 0.5) * C;
+    cx[id] = x; cz[id] = z;
+    const R = innerR(x) - 0.12, half = Math.sqrt(Math.max(0, R * R - WL * WL));
+    const f = floorAt(x, z);
+    floor[id] = f;
+    shallow[id] = clamp(1 - (WL - f) / 2.6, 0, 1);
+    cvar[id] = 0.94 + hash2(i * 7 + 3, k * 13 + 1) * 0.12;
+    if (Math.abs(z) < half - 0.08 && terrainH(x, z) < WL - 0.06) { wet[id] = 1; W.push(id); }
+  }
+  for (let k = 0; k < nz; k++) for (let i = 0; i < nx; i++) {
+    const id = k * nx + i, n = [i > 0 ? id - 1 : -1, i < nx - 1 ? id + 1 : -1, k > 0 ? id - nx : -1, k < nz - 1 ? id + nx : -1];
+    for (let j = 0; j < 4; j++) nb[id * 4 + j] = n[j] >= 0 && wet[n[j]] ? n[j] : id;
+  }
+  // swell components: direction, wavenumber, amplitude, phase
+  const waves = [[1, 0.15, 1.05, 0.1, 0], [0.8, -0.6, 1.7, 0.06, 1.3], [0.3, 1, 2.6, 0.035, 2.1], [-0.6, 0.8, 0.8, 0.05, 4.0], [0.95, 0.3, 3.6, 0.02, 0.7]]
+    .map(([dx, dz, k, a, ph]) => { const l = Math.hypot(dx, dz); return { dx: dx / l, dz: dz / l, k, a, ph, om: Math.sqrt(9.8 * k) * 0.55 }; });
+  let amp = 1, chop = 0;
+  function swell(x, z, t) {
+    let s = 0;
+    for (let i = 0; i < waves.length; i++) {
+      const w = waves[i], th = (x * w.dx + z * w.dz) * w.k - t * w.om + w.ph;
+      s += w.a * (Math.sin(th) + (i === 0 ? 0.22 * Math.sin(2 * th) * (0.4 + chop) : 0));
+    }
+    return s * amp;
+  }
+  // slosh state: surface plane y = WL + sx*(x - xc) + sz*z
+  const XC = (x0 + x1) * 0.5 - 1.5;
+  const slope = new THREE.Vector2(), slopeV = new THREE.Vector2(), target = new THREE.Vector2();
+  const slosh = (x, z) => slope.x * (x - XC) + slope.y * z;
+
+  // ---- render: one instanced box per wet column -------------------------
+  const geo = new THREE.BoxGeometry(1, 1, 1); geo.translate(0, 0.5, 0);
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.16, metalness: 0.02, transparent: true, opacity: 0.86 });
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uSky = U.uSky;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vUp;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvUp = abs(normal.y);');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 uSky;\nvarying float vUp;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      diffuseColor.rgb = mix(diffuseColor.rgb * vec3(0.42, 0.62, 0.72), diffuseColor.rgb, vUp);
+      diffuseColor.a *= mix(0.78, 1.0, vUp);`)
+      .replace('#include <opaque_fragment>', `outgoingLight += uSky * pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 4.0) * 0.55 * vUp;
+      #include <opaque_fragment>`);
+  };
+  const mesh = new THREE.InstancedMesh(geo, mat, W.length);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(W.length * 3), 3);
+  mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+  mesh.frustumCulled = false; mesh.receiveShadow = true; mesh.renderOrder = 4;
+  bottle.add(mesh);
+  const toLin = (hx) => { const c = new THREE.Color(hx); return [c.r, c.g, c.b]; };
+  const DEEP = toLin(0x17648f), MID = toLin(0x2591b4), SHAL = toLin(0x52d3c6), CREST = toLin(0x8fe3ea), FOAM = toLin(0xf4fbff);
+
+  // ---- translucent water body below the voxel skin (sheared by slosh in the shader) ----
+  const R0 = R_IN - 0.05, hw = Math.sqrt(R0 * R0 - Y_BODY * Y_BODY), a0 = Math.atan2(Y_BODY, hw);
+  const shp = new THREE.Shape();
+  shp.moveTo(hw, Y_BODY);
+  for (let i = 1; i <= 48; i++) { const a = a0 - (i / 48) * (Math.PI + 2 * a0); shp.lineTo(Math.cos(a) * R0, Math.sin(a) * R0); }
+  shp.lineTo(hw, Y_BODY);
+  const bodyGeo = new THREE.ExtrudeGeometry(shp, { depth: x1 - x0 - 0.1, bevelEnabled: false, curveSegments: 1, steps: 24 });
+  bodyGeo.rotateY(Math.PI / 2); bodyGeo.translate(x0 + 0.05, 0, 0);
+  const bodyMat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false,
+    uniforms: { uSlope: U.uSlope, uDay: U.uDay, uYB: { value: Y_BODY } },
+    vertexShader: `uniform vec3 uSlope; uniform float uYB; varying vec3 vN; varying vec3 vV;
+      void main(){ vec3 p = position; float w = clamp((p.y + 7.0) / (uYB + 7.0), 0.0, 1.0);
+        p.y += (uSlope.x * (p.x - uSlope.z) + uSlope.y * p.z) * w;
+        vec4 wp = modelMatrix * vec4(p, 1.0); vN = normalize(mat3(modelMatrix) * normal); vV = cameraPosition - wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp; }`,
+    fragmentShader: `uniform float uDay; varying vec3 vN; varying vec3 vV;
+      void main(){ float f = 1.0 - abs(dot(normalize(vN), normalize(vV)));
+        vec3 col = vec3(0.03, 0.24, 0.33) * (0.22 + 0.78 * uDay);
+        gl_FragColor = vec4(col, 0.22 + f * 0.26); }`,
+  });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.renderOrder = 3; bottle.add(body);
+
+  // ---- depth sorting so the translucent columns blend back-to-front ----
+  let order = W.slice();
+  const key = new Float32Array(N), camL = new THREE.Vector3();
+  function sort() {
+    camL.copy(camera.position); bottle.worldToLocal(camL);
+    for (const id of W) { const dx = cx[id] - camL.x, dy = WL - camL.y, dz = cz[id] - camL.z; key[id] = dx * dx + dy * dy + dz * dz; }
+    order.sort((a, b) => key[b] - key[a]);
+  }
+
+  // ---- public API --------------------------------------------------------
+  const api = {
+    nx, nz, C, x0, x1, zM, slope, slopeV, target, XC, swell, wet, cx, cz,
+    get amp() { return amp; },
+    cellAt(x, z) { const i = Math.floor((x - x0) / C), k = Math.floor((z + zM) / C); return i < 0 || k < 0 || i >= nx || k >= nz ? -1 : k * nx + i; },
+    isWet(x, z) { const id = this.cellAt(x, z); return id >= 0 && wet[id] === 1; },
+    heightAt(x, z) {
+      const fx = (x - x0) / C - 0.5, fz = (z + zM) / C - 0.5;
+      const i = clamp(Math.floor(fx), 0, nx - 2), k = clamp(Math.floor(fz), 0, nz - 2);
+      const u = clamp(fx - i, 0, 1), v = clamp(fz - k, 0, 1), id = k * nx + i;
+      return lerp(lerp(h[id], h[id + 1], u), lerp(h[id + nx], h[id + nx + 1], u), v);
+    },
+    gradAt(x, z, out) { const e = 0.25; out.x = (this.heightAt(x + e, z) - this.heightAt(x - e, z)) / (2 * e); out.y = (this.heightAt(x, z + e) - this.heightAt(x, z - e)) / (2 * e); return out; },
+    disturb(x, z, amt, rad = 0.4) {
+      const r = Math.ceil(rad / C), ci = Math.floor((x - x0) / C), ck = Math.floor((z + zM) / C);
+      for (let k = ck - r; k <= ck + r; k++) for (let i = ci - r; i <= ci + r; i++) {
+        if (i < 1 || k < 1 || i >= nx - 1 || k >= nz - 1) continue;
+        const id = k * nx + i; if (!wet[id]) continue;
+        const d2 = ((cx[id] - x) ** 2 + (cz[id] - z) ** 2) / (rad * rad);
+        if (d2 < 1) rip[id] -= amt * (1 - d2);
+      }
+    },
+    addFoam(x, z, amt, rad = 0.3) {
+      const r = Math.ceil(rad / C), ci = Math.floor((x - x0) / C), ck = Math.floor((z + zM) / C);
+      for (let k = ck - r; k <= ck + r; k++) for (let i = ci - r; i <= ci + r; i++) {
+        if (i < 0 || k < 0 || i >= nx || k >= nz) continue;
+        const id = k * nx + i, d2 = ((cx[id] - x) ** 2 + (cz[id] - z) ** 2) / (rad * rad);
+        if (d2 < 1) foam[id] = Math.min(1, foam[id] + amt * (1 - d2));
+      }
+    },
+    kick(vx, vz) { slopeV.x += vx; slopeV.y += vz; },
+    update(dt, t, storm) {
+      amp = 1 + storm * 2.4; chop = storm;
+      // slosh: damped oscillator toward the plane normal to local gravity
+      const wx = 1.15, wz = 2.0, ze = 0.06;
+      slopeV.x += (-wx * wx * (slope.x - target.x) - 2 * ze * wx * slopeV.x) * dt;
+      slopeV.y += (-wz * wz * (slope.y - target.y) - 2 * ze * wz * slopeV.y) * dt;
+      slope.x = clamp(slope.x + slopeV.x * dt, -0.11, 0.11); slope.y = clamp(slope.y + slopeV.y * dt, -0.16, 0.16);
+      U.uSlope.value.set(slope.x, slope.y, XC);
+      // ripple field: explicit wave equation, fixed 45 Hz substeps
+      this.acc = (this.acc || 0) + dt;
+      while (this.acc > 1 / 45) {
+        this.acc -= 1 / 45;
+        for (let j = 0; j < W.length; j++) {
+          const id = W[j], b = id * 4;
+          ripP[id] = ((rip[nb[b]] + rip[nb[b + 1]] + rip[nb[b + 2]] + rip[nb[b + 3]]) * 0.5 - ripP[id]) * 0.984;
+        }
+        const tmp = rip; rip = ripP; ripP = tmp;
+      }
+      // heights for every cell (dry cells too, so sampling stays smooth)
+      const fd = Math.exp(-dt * 0.8), thr = 0.12 * amp;
+      for (let id = 0; id < N; id++) {
+        const sw = swell(cx[id], cz[id], t), r = wet[id] ? clamp(rip[id], -1.2, 1.2) : 0;
+        h[id] = WL + slosh(cx[id], cz[id]) + sw + r;
+        if (wet[id]) foam[id] = Math.min(1, foam[id] * fd + Math.max(0, sw + r - thr) * dt * 4 + Math.max(0, Math.abs(r) - 0.09) * dt * 3);
+      }
+      if ((this.frame = (this.frame || 0) + 1) % 8 === 1) sort();
+      // write instances
+      const M = mesh.instanceMatrix.array, CL = mesh.instanceColor.array;
+      for (let s = 0; s < order.length; s++) {
+        const id = order[s], x = cx[id], z = cz[id];
+        const yb = Math.max(floor[id], Y_BODY + slosh(x, z) * clamp((Y_BODY + 7) / (Y_BODY + 7), 0, 1));
+        let top = Math.round(h[id] * 10) / 10, hg = top - yb;
+        if (hg < 0.1) hg = top > floor[id] ? 0.1 : 0.0001;
+        const o = s * 16;
+        M[o] = C; M[o + 5] = hg; M[o + 10] = C; M[o + 12] = x; M[o + 13] = yb; M[o + 14] = z; M[o + 15] = 1;
+        const sh = shallow[id], cr = clamp((h[id] - WL - slosh(x, z)) / (0.25 * amp) + 0.1, 0, 1), fo = foam[id], v = cvar[id];
+        for (let c = 0; c < 3; c++) {
+          let col = sh < 0.5 ? lerp(DEEP[c], MID[c], sh * 2) : lerp(MID[c], SHAL[c], sh * 2 - 1);
+          col = lerp(col, CREST[c], cr * 0.45);
+          CL[s * 3 + c] = lerp(col, FOAM[c], fo * 0.92) * v;
+        }
+      }
+      mesh.instanceMatrix.needsUpdate = true; mesh.instanceColor.needsUpdate = true;
+    },
+  };
+  return api;
+})();
+
+// =====================================================================
+//  ISLAND PROPS (0.1 voxels): palms, hut, campfire, castaway, SOS, chest,
+//  lighthouse + cottage + pier, volcano lava, sea arch
+// =====================================================================
+document.getElementById('loadmsg').textContent = 'planting palms & raising the lighthouse';
+const PROPS = { swayers: [] };
+const props = new VoxelModel(), propGlow = new VoxelModel();
+const surfY = (x, z) => (Math.floor(terrainH(x, z) / 0.2) + 1) * 0.2;
+const gy = (x, z) => Math.round(surfY(x, z) * 10);
+const V10 = (v) => Math.round(v * 10);
+
+function palm(x, z, H, lean, dir) {
+  const X = V10(x), Z = V10(z), Y = gy(x, z);
+  let tx = X, tz = Z;
+  for (let j = 0; j < H; j++) {
+    const off = lean * (j / H) ** 2;
+    tx = Math.round(X + Math.cos(dir) * off); tz = Math.round(Z + Math.sin(dir) * off);
+    props.box(tx, Y + j, tz, tx + 1, Y + j, tz + 1, vary(j % 3 === 0 ? 0x6e5032 : 0x96714a, 0.05));
+  }
+  const crown = new VoxelModel();
+  const GREENS = [0x3f9a3a, 0x4fb043, 0x2f8a35, 0x66bf4a];
+  for (const [cx, cy, cz] of [[1, -1, 0], [-1, -1, 1], [0, -2, -1]]) crown.ball(cx, cy, cz, 1.1, 0x5a3b1e);
+  const nF = 7, a0 = rand() * TAU;
+  for (let f = 0; f < nF; f++) {
+    const a = a0 + (f / nF) * TAU + rr(-0.2, 0.2), L = ri(11, 15), g = pick(GREENS), ca = Math.cos(a), sa = Math.sin(a);
+    for (let s = 0; s <= L; s++) {
+      const u = s / L, y = Math.round(2.2 * Math.sin(u * 2.2) - u * u * 6.5);
+      const px = Math.round(ca * s), pz = Math.round(sa * s);
+      crown.set(px, y, pz, vary(g, 0.08));
+      const w = Math.round((1 - u) * 2.6 + 0.4);
+      for (let q = 1; q <= w; q++) for (const sg of [-1, 1]) crown.set(Math.round(px - sa * q * sg), y - (q > 1 ? 1 : 0), Math.round(pz + ca * q * sg), vary(shade(g, 0.9), 0.08));
+    }
+  }
+  const mesh = voxMesh(crown, 0.1, voxMat, [-0.5, 0, -0.5]);
+  mesh.position.set((tx + 1) * 0.1, (Y + H) * 0.1, (tz + 1) * 0.1);
+  bottle.add(mesh);
+  PROPS.swayers.push({ mesh, ph: rand() * TAU, amp: 0.05 + H * 0.0015 });
+}
+palm(ISL.x - 0.9, ISL.z - 0.5, 26, 7, 2.6);
+palm(ISL.x - 0.2, ISL.z + 0.4, 30, 9, 0.9);
+palm(ISL.x + 0.9, ISL.z - 0.1, 22, 6, -0.5);
+palm(ISL.x - 2.3, ISL.z + 0.3, 18, 8, 3.4);
+palm(ISL.x + 2.4, ISL.z + 0.9, 16, 7, 0.2);
+palm(LH.x + 1.9, LH.z - 1.9, 14, 5, 2.0);
+
+// --- tiki hut ---------------------------------------------------------
+(function hut() {
+  const x = ISL.x + 1.55, z = ISL.z - 0.75, X = V10(x), Z = V10(z), Y = gy(x, z);
+  props.box(X - 6, Y, Z - 5, X + 6, Y + 1, Z + 5, (a, b, c) => vary((a + c) % 2 ? 0x8a6239 : 0x7a5530, 0.05)); // platform
+  for (const [px, pz] of [[-6, -5], [6, -5], [-6, 5], [6, 5]]) props.box(X + px, Y - 3, Z + pz, X + px, Y + 9, Z + pz, 0x5c3f22);
+  for (let y = Y + 2; y <= Y + 7; y++) for (let i = -5; i <= 5; i++) {
+    const bam = (i + 20) % 2 ? 0xb9a35a : 0xa08a44;
+    props.set(X + i, y, Z - 5, vary(bam, 0.05)); if (i < -1 || i > 1 || y > Y + 5) props.set(X + i, y, Z + 5, vary(bam, 0.05));
+    if (Math.abs(i) <= 4) { props.set(X - 6, y, Z + i, vary(bam, 0.05)); props.set(X + 6, y, Z + i, vary(bam, 0.05)); }
+  }
+  for (let l = 0; l <= 7; l++) for (let i = -8; i <= 8; i++) for (const s of [-1, 1]) {
+    const zz = Z + s * (7 - l), c = (l + i) % 3 === 0 ? 0xc9a24a : 0xdcb75e;
+    props.set(X + i, Y + 8 + l, zz, vary(c, 0.08)); props.set(X + i, Y + 8 + l, zz - s, vary(c, 0.08));
+  }
+  for (let i = -8; i <= 8; i += 2) props.set(X + i, Y + 7, Z + 8, 0xb88f3a);   // fringe
+})();
+
+// --- campfire + castaway + SOS + chest ------------------------------------
+(function camp() {
+  const x = ISL.x + 0.2, z = ISL.z + 1.35, X = V10(x), Z = V10(z), Y = gy(x, z);
+  for (let a = 0; a < 10; a++) { const px = X + Math.round(Math.cos(a / 10 * TAU) * 3), pz = Z + Math.round(Math.sin(a / 10 * TAU) * 3); props.set(px, Y, pz, vary(0x8d8a86, 0.1)); }
+  props.line(X - 2, Y, Z - 1, X + 2, Y + 1, Z + 1, 0x5b3a1f); props.line(X - 2, Y + 1, Z + 1, X + 2, Y, Z - 1, 0x6b4526);
+  propGlow.box(X - 1, Y, Z - 1, X + 1, Y, Z + 1, (a, b, c) => ((a + c) % 2 ? 0xff7a1c : 0xffb347));
+  PROPS.fire = new THREE.Vector3(X * 0.1 + 0.05, Y * 0.1 + 0.15, Z * 0.1 + 0.05);
+  // castaway, standing by the fire waving at the ship
+  const cx = X + 5, cz = Z - 1, cy = gy(x + 0.5, z - 0.1);
+  props.box(cx, cy, cz, cx + 1, cy + 2, cz, 0x3b5b9a);                         // trousers
+  props.box(cx, cy + 3, cz, cx + 1, cy + 5, cz, (a, b) => (b % 2 ? 0xf1f1ea : 0xc8423a)); // striped shirt
+  props.box(cx, cy + 6, cz, cx + 1, cy + 7, cz, 0xf0c39a); props.box(cx, cy + 8, cz, cx + 1, cy + 8, cz, 0x5b3a20);
+  props.line(cx + 2, cy + 5, cz, cx + 3, cy + 8, cz, 0xf0c39a);                  // raised arm
+  // "SOS" in pebbles on the beach facing the viewer
+  const F = { S: ['111', '100', '111', '001', '111'], O: ['111', '101', '101', '101', '111'] };
+  let ox = V10(ISL.x - 1.3);
+  for (const ch of 'SOS') {
+    F[ch].forEach((row, r) => [...row].forEach((b, c) => {
+      if (b !== '1') return; const px = ox + c, pz = V10(ISL.z + 2.05) + r;
+      props.set(px, gy(px / 10, pz / 10), pz, vary(0xf4f1ea, 0.04));
+    }));
+    ox += 5;
+  }
+  // open treasure chest spilling gold
+  const tx = V10(ISL.x - 2.5), tz = V10(ISL.z + 1.2), ty = gy(tx / 10, tz / 10);
+  props.box(tx, ty, tz, tx + 5, ty + 3, tz + 3, (a, b, c) => (b === ty + 1 || a === tx || a === tx + 5 ? 0x3d2a17 : 0x7a4a22));
+  props.box(tx + 1, ty + 4, tz + 1, tx + 4, ty + 4, tz + 2, 0xffd34a);
+  props.box(tx, ty + 4, tz - 2, tx + 5, ty + 6, tz - 2, 0x7a4a22); // open lid
+  for (let i = 0; i < 26; i++) { const a = rand() * TAU, d = rr(2, 6); props.set(tx + 3 + Math.round(Math.cos(a) * d), ty, tz + 1 + Math.round(Math.sin(a) * d * 0.7), pick([0xffd34a, 0xf2b630, 0xfff07a, 0xe0e0ff])); }
+  propGlow.set(tx + 2, ty + 5, tz + 1, 0xfff3a0); propGlow.set(tx + 4, ty + 5, tz + 2, 0xff7aa8);
+  // bushes, flowers, boulders
+  for (let i = 0; i < 60; i++) {
+    const a = rand() * TAU, r = Math.sqrt(rand()) * 0.78, x2 = ISL.x + Math.cos(a) * r * ISL.ax, z2 = ISL.z + Math.sin(a) * r * ISL.az;
+    if (terrainH(x2, z2) < WL + 0.4 || Math.hypot(x2 - ISL.x - 1.55, z2 + 0.75) < 1 || Math.hypot(x2 - x, z2 - z) < 0.5) continue;
+    const bx = V10(x2), bz = V10(z2), by = gy(x2, z2);
+    if (rand() < 0.55) { props.ball(bx, by + 1, bz, rr(1, 2.2), vary(pick([0x3c8d34, 0x2f7a2c, 0x4a9e3a]), 0.1), 0.8); if (rand() < 0.7) props.set(bx, by + 3, bz, pick([0xff4f7b, 0xffd23f, 0xff8a3d, 0xc77dff, 0xffffff])); }
+    else props.set(bx, by, bz, pick([0xff4f7b, 0xffd23f, 0xffffff, 0xff8a3d]));
+  }
+  for (let i = 0; i < 9; i++) { const a = rand() * TAU, x2 = ISL.x + Math.cos(a) * ISL.ax * 0.93, z2 = ISL.z + Math.sin(a) * ISL.az * 0.93; props.ball(V10(x2), gy(x2, z2), V10(z2), rr(1.2, 2.4), vary(0x8f8b85, 0.1), 0.7); }
+})();
+
+// --- lighthouse, keeper's cottage, pier --------------------------------------
+(function lighthouse() {
+  const X = V10(LH.x), Z = V10(LH.z), Y = gy(LH.x, LH.z) - 2, H = 31;
+  props.box(X - 7, Y - 3, Z - 7, X + 7, Y + 1, Z + 7, (a, b, c) => (Math.hypot(a - X, c - Z) < 7.5 ? vary(0x9b968c, 0.06) : undefined));
+  for (const [k, c] of [...props.map]) if (c === undefined) props.map.delete(k);
+  for (let j = 2; j < H; j++) {
+    const r = lerp(5.6, 3.9, j / H), col = Math.floor((j - 2) / 5) % 2 ? 0xf3efe4 : 0xd2382b;
+    for (let a = -7; a <= 7; a++) for (let b = -7; b <= 7; b++) if (a * a + b * b <= r * r) props.set(X + a, Y + j, Z + b, vary(col, 0.03));
+  }
+  props.box(X - 6, Y + 2, Z - 1, X - 5, Y + 6, Z + 1, 0x4a2f1c);                    // door (faces the sea)
+  for (const wy of [12, 20]) props.set(X - Math.round(lerp(5.6, 3.9, wy / H)) - 0, Y + wy, Z, 0x223044);
+  for (let a = -6; a <= 6; a++) for (let b = -6; b <= 6; b++) {
+    const d = Math.hypot(a, b);
+    if (d <= 6.4) props.set(X + a, Y + H, Z + b, 0x3a3a3e);
+    if (d > 5.5 && d <= 6.4 && (a + b) % 2 === 0) props.box(X + a, Y + H + 1, Z + b, X + a, Y + H + 2, Z + b, 0x1d1d22);
+  }
+  for (let j = 1; j <= 5; j++) for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++)
+    if (a * a + b * b <= 9.5) (Math.abs(a) === 3 || Math.abs(b) === 3 || a * a + b * b > 6) && (a + b + j) % 4 === 0 ? props.set(X + a, Y + H + j, Z + b, 0x1d1d22) : propGlow.set(X + a, Y + H + j, Z + b, 0xfff1b8);
+  for (let j = 0; j <= 3; j++) { const r = 4 - j * 1.2; for (let a = -4; a <= 4; a++) for (let b = -4; b <= 4; b++) if (a * a + b * b <= r * r + 0.5) props.set(X + a, Y + H + 6 + j, Z + b, 0xb3261e); }
+  props.box(X, Y + H + 10, Z, X, Y + H + 12, Z, 0x111111);
+  PROPS.lamp = new THREE.Vector3(X * 0.1 + 0.05, (Y + H + 3) * 0.1, Z * 0.1 + 0.05);
+  // keeper's cottage
+  const cx = V10(LH.x + 1.1), cz = V10(LH.z + 1.5), cy = gy(LH.x + 1.1, LH.z + 1.5) - 1;
+  props.box(cx - 5, cy - 2, cz - 4, cx + 5, cy + 6, cz + 4, (a, b, c) => vary(b < cy ? 0x8e8a80 : 0xeee6d2, 0.03));
+  for (let l = 0; l <= 5; l++) props.box(cx - 6, cy + 7 + l, cz - 5 + l, cx + 6, cy + 7 + l, cz + 5 - l, (a) => vary(a % 2 ? 0x9e3b2c : 0xb4483a, 0.04));
+  props.box(cx + 3, cy + 9, cz - 1, cx + 4, cy + 14, cz, 0x7b6f66);
+  PROPS.chimney = new THREE.Vector3((cx + 3.5) * 0.1, (cy + 15) * 0.1, (cz - 0.5) * 0.1);
+  propGlow.box(cx - 2, cy + 2, cz - 5, cx - 1, cy + 4, cz - 5, 0xffc46b); propGlow.box(cx + 1, cy + 2, cz - 5, cx + 2, cy + 4, cz - 5, 0xffc46b);
+  props.box(cx - 6, cy + 1, cz - 1, cx - 6, cy + 5, cz + 1, 0x5a3a22);
+  // wooden pier reaching into the sea
+  const pz = V10(-2.7), deck = V10(WL + 0.38);
+  for (let px = V10(7.0); px <= V10(9.2); px++) {
+    props.box(px, deck, pz - 3, px, deck, pz + 3, vary(px % 3 === 0 ? 0x8a6a45 : 0xa47c4e, 0.05));
+    if (px % 6 === 0) for (const s of [-3, 3]) props.box(px, Math.round(floorAt(px / 10, (pz + s) / 10) * 10), pz + s, px, deck + 3, pz + s, 0x5a3f27);
+  }
+  PROPS.pier = new THREE.Vector3(6.75, WL, -2.1);
+})();
+
+// --- volcano lava rivers + sea arch lintel ------------------------------------
+(function volcanoAndArch() {
+  for (const dir of [-1.95, -2.6]) {
+    for (let t = 0; t <= 1; t += 0.01) {
+      const d = 0.4 + t * 1.25, wob = Math.sin(t * 9 + dir) * 0.12;
+      const x = VOL.x + Math.cos(dir + wob) * d, z = VOL.z + Math.sin(dir + wob) * d;
+      const y = terrainH(x, z); if (y < WL) { PROPS.lavaEnd = PROPS.lavaEnd || []; PROPS.lavaEnd.push(new THREE.Vector3(x, WL, z)); break; }
+      propGlow.box(V10(x), Math.round(y * 10) + 1, V10(z), V10(x) + 1, Math.round(y * 10) + 1, V10(z) + 1, t < 0.5 ? 0xffa22a : 0xff5a14);
+    }
+  }
+  PROPS.vent = new THREE.Vector3(VOL.x, WL + 1.6, VOL.z);
+  const X = V10(ARCH.x), Z = V10(ARCH.z), base = V10(WL + 1.55);
+  for (let dx = -12; dx <= 12; dx++) {
+    const u = dx / 9, lo = base + Math.round(Math.max(0, 1 - u * u) * 2.5);
+    for (let y = lo; y <= base + 6 - Math.round(Math.abs(u) * 0.8); y++) for (let dz = -3; dz <= 3; dz++)
+      props.set(X + dx, y, Z + dz, vary((y + (dx > 0 ? 1 : 0)) % 3 ? 0xb48a60 : 0x9c7552, 0.06));
+  }
+  props.box(X - 4, base + 7, Z - 2, X + 3, base + 7, Z + 2, (a, b, c) => (hash3(a, b, c) < 0.6 ? vary(0x5fa83c, 0.1) : undefined));
+  for (const [k, c] of [...props.map]) if (c === undefined) props.map.delete(k);
+  for (let i = 0; i < 4; i++) props.box(X - 6 + i * 4, base + 7, Z - 2 + (i % 2) * 3, X - 6 + i * 4, base + 8, Z - 2 + (i % 2) * 3, 0xffffff);
+})();
+
+bottle.add(voxMesh(props, 0.1));
+bottle.add(voxMesh(propGlow, 0.1, glowMat, [0, 0, 0], false));
+
+// =====================================================================
+//  UNDERWATER: coral reefs, sponges, sea fans, starfish, kelp forest,
+//  anchor, sunken chest + pearl clam, amphorae, an old wreck
+// =====================================================================
+document.getElementById('loadmsg').textContent = 'growing coral';
+const reef = new VoxelModel(), reefGlow = new VoxelModel();
+const CORAL = [0xff6f91, 0xff9a3c, 0x9b5de5, 0xffd23f, 0xe63946, 0x2ec4b6, 0xf15bb5, 0x4cc9f0, 0xff70a6];
+PROPS.bubblers = [];
+const sandAt = (x, z) => { const R = innerR(x) - 0.15; return Math.abs(z) < R && terrainH(x, z) > -Math.sqrt(R * R - z * z) + 0.1; };
+const capH = (Y) => Math.max(2, Math.floor((WL - 1.0) * 10) - Y);
+
+function branchCoral(X, Y, Z, H, c) {
+  const st = [[X, Y, Z, H, 0]];
+  while (st.length) {
+    let [x, y, z, h, d] = st.pop();
+    for (let i = 0; i < h; i++) {
+      reef.set(x, y, z, vary(c, 0.08)); y++;
+      if (rand() < 0.3) x += ri(-1, 1); if (rand() < 0.3) z += ri(-1, 1);
+      if (d < 3 && rand() < 0.2) st.push([x, y, z, Math.max(2, Math.floor((h - i) * 0.8)), d + 1]);
+    }
+    reef.set(x, y, z, shade(c, 1.3));
+  }
+}
+function brainCoral(X, Y, Z, r, c1, c2) {
+  const R = Math.ceil(r);
+  for (let a = -R; a <= R; a++) for (let b = 0; b <= R; b++) for (let c = -R; c <= R; c++)
+    if (a * a + b * b * 1.6 + c * c <= r * r) reef.set(X + a, Y + b, Z + c, Math.sin(a * 1.5 + c * 0.9 + b * 1.2) > 0 ? vary(c1, 0.05) : vary(c2, 0.05));
+}
+function tubeSponge(X, Y, Z, h, c) {
+  for (let y = 0; y < h; y++) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) {
+    const d = a * a + b * b; if (d >= 2 && d <= 5) reef.set(X + a, Y + y, Z + b, vary(y === h - 1 ? shade(c, 1.25) : c, 0.06));
+  }
+}
+function seaFan(X, Y, Z, h, ang, c) {
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  for (let y = 0; y < h; y++) {
+    const w = Math.round(Math.sin((y / h) * Math.PI) * h * 0.45);
+    for (let s = -w; s <= w; s++) if ((s + y) % 2 === 0 || Math.abs(s) === w || y % 3 === 0)
+      reef.set(X + Math.round(ca * s), Y + y, Z + Math.round(sa * s), vary(c, 0.1));
+  }
+  reef.box(X, Y, Z, X, Y + 2, Z, shade(c, 0.6));
+}
+function starfish(X, Y, Z, c) {
+  reef.set(X, Y, Z, c);
+  const a0 = rand() * TAU;
+  for (let k = 0; k < 5; k++) { const a = a0 + (k / 5) * TAU; for (let s = 1; s <= 3; s++) reef.set(X + Math.round(Math.cos(a) * s), Y, Z + Math.round(Math.sin(a) * s), vary(c, 0.08)); }
+}
+function anemone(X, Y, Z, c) {
+  reef.box(X - 1, Y, Z - 1, X + 1, Y, Z + 1, shade(c, 0.7));
+  for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (rand() < 0.8) { const h = ri(1, 3); reef.box(X + a, Y + 1, Z + b, X + a, Y + h, Z + b, vary(c, 0.1)); reef.set(X + a, Y + h + 1, Z + b, shade(c, 1.4)); }
+}
+function scatter(x, z) {
+  if (!sandAt(x, z)) return;
+  const X = V10(x), Z = V10(z), Y = gy(x, z), cap = capH(Y), r = rand(), c = pick(CORAL);
+  if (r < 0.32) branchCoral(X, Y, Z, Math.min(cap, ri(5, 11)), c);
+  else if (r < 0.48) brainCoral(X, Y, Z, Math.min(cap, rr(2.2, 4)), c, shade(c, 0.7));
+  else if (r < 0.62) tubeSponge(X, Y, Z, Math.min(cap, ri(4, 9)), pick([0x9b5de5, 0xff9a3c, 0xf15bb5, 0xffd23f]));
+  else if (r < 0.74) seaFan(X, Y, Z, Math.min(cap, ri(6, 11)), rand() * TAU, pick([0xe63946, 0x9b5de5, 0xff70a6]));
+  else if (r < 0.86) anemone(X, Y, Z, pick([0xff6f91, 0x2ec4b6, 0xc77dff, 0x80ed99]));
+  else starfish(X, Y, Z, pick([0xff7b39, 0xe63946, 0xffb703, 0xb5179e]));
+}
+for (const f of REEFS) for (let i = 0; i < 22; i++) { const a = rand() * TAU, d = Math.sqrt(rand()) * f.r * 0.95; scatter(f.x + Math.cos(a) * d, f.z + Math.sin(a) * d); }
+for (let i = 0; i < 140; i++) {
+  const a = rand() * TAU, r = rr(1.05, 2.1), x = ISL.x + Math.cos(a) * r * ISL.ax, z = ISL.z + Math.sin(a) * r * ISL.az;
+  const h = terrainH(x, z); if (h < WL - 0.95 && h > WL - 3.6) scatter(x, z);
+}
+for (let i = 0; i < 70; i++) { const x = rr(-15, 9), z = rr(-5, 5); if (terrainH(x, z) < WL - 3.0 && rand() < 0.55) scatter(x, z); }
+for (let i = 0; i < 40; i++) { const x = rr(-15, 9), z = rr(-5, 5); if (sandAt(x, z) && terrainH(x, z) < WL - 1.2) starfish(V10(x), gy(x, z), V10(z), pick([0xff7b39, 0xe63946, 0xffb703, 0xfff1e6])); }
+
+// --- anchor -----------------------------------------------------------
+(function anchor() {
+  const X = V10(-9.0), Z = V10(-3.4), Y = gy(-9.0, -3.4) - 1, IR = 0x3b3f45;
+  reef.box(X, Y, Z, X + 1, Y + 14, Z, IR); reef.box(X - 3, Y + 12, Z, X + 4, Y + 12, Z, IR);
+  for (let a = 0; a <= 8; a++) { const t = (a / 8) * Math.PI; reef.box(X + Math.round(Math.cos(t) * 6), Y + Math.round(Math.sin(-t) * 3) + 3, Z, X + Math.round(Math.cos(t) * 6) + 1, Y + Math.round(Math.sin(-t) * 3) + 3, Z, IR); }
+  reef.box(X - 7, Y + 3, Z, X - 7, Y + 5, Z, IR); reef.box(X + 8, Y + 3, Z, X + 8, Y + 5, Z, IR);
+  for (let a = 0; a < 12; a++) { const t = (a / 12) * TAU; reef.set(X + Math.round(Math.cos(t) * 2), Y + 16 + Math.round(Math.sin(t) * 2), Z, 0x4a4f55); }
+  for (let i = 0; i < 18; i++) reef.set(X + 2 + i, Y + 1 + (i % 3 === 0 ? 1 : 0), Z + Math.round(Math.sin(i * 0.6) * 2), 0x53575c);  // chain
+})();
+
+// --- sunken chest + giant clam with a glowing pearl ------------------------------
+(function chest() {
+  const x = -12.2, z = 2.6, X = V10(x), Z = V10(z), Y = gy(x, z);
+  reef.box(X, Y, Z, X + 6, Y + 3, Z + 4, (a, b, c) => (a === X || a === X + 6 || b === Y + 2 ? 0x2a2a2a : vary(0x6b4423, 0.06)));
+  reef.box(X, Y + 4, Z + 4, X + 6, Y + 7, Z + 4, vary(0x6b4423, 0.06));
+  reef.box(X + 1, Y + 4, Z + 1, X + 5, Y + 4, Z + 3, (a, b, c) => ((a + c) % 2 ? 0xffd34a : 0xf2b630));
+  reefGlow.set(X + 3, Y + 5, Z + 2, 0xfff2a8);
+  const cx = X - 6, cz = Z - 3, cy = gy((X - 6) / 10, (Z - 3) / 10);
+  for (let a = -4; a <= 4; a++) for (let c = -3; c <= 3; c++) if (a * a / 16 + c * c / 9 <= 1) {
+    reef.set(cx + a, cy, cz + c, vary(0x7fa7c9, 0.05));
+    if (Math.abs(a) >= 3 || Math.abs(c) >= 2) reef.set(cx + a, cy + 1, cz + c, (a + 10) % 2 ? 0x9ac3e0 : 0x6f95b8);
+  }
+  for (let a = -4; a <= 4; a++) reef.box(cx + a, cy + 2, cz - 3 - Math.round(Math.abs(a) * 0.3), cx + a, cy + 5 - Math.round(Math.abs(a) * 0.5), cz - 3 - Math.round(Math.abs(a) * 0.3), (a + 10) % 2 ? 0x9ac3e0 : 0x6f95b8);
+  reefGlow.box(cx, cy + 1, cz, cx + 1, cy + 2, cz + 1, 0xfff0ff);
+  PROPS.bubblers.push(new THREE.Vector3((cx + 0.5) * 0.1, (cy + 3) * 0.1, (cz + 0.5) * 0.1), new THREE.Vector3((X + 3) * 0.1, (Y + 6) * 0.1, (Z + 2) * 0.1));
+})();
+
+// --- amphorae + an old wreck -------------------------------------------------
+(function wreck() {
+  for (const [x, z, tilt] of [[3.2, 2.4, 0], [3.7, 2.9, 1], [2.6, 3.2, 0]]) {
+    const X = V10(x), Z = V10(z), Y = gy(x, z);
+    for (let y = 0; y < 8; y++) {
+      const r = y < 1 ? 1 : y < 5 ? 2 : y < 6 ? 1 : 1.5;
+      for (let a = -2; a <= 2; a++) for (let c = -2; c <= 2; c++) if (a * a + c * c <= r * r + 0.3) {
+        const px = tilt ? X + a + y : X + a, py = tilt ? Y + 2 + c : Y + y, pz = Z + (tilt ? 0 : c) + (tilt ? Math.round(a * 0) : 0);
+        reef.set(px, py, tilt ? Z + c : pz, vary(y === 3 ? 0x8a3b1d : 0xb5562c, 0.06));
+      }
+    }
+  }
+  const x0 = 1.0, z0 = 3.0, Y0 = gy(1.6, 2.9) - 2, W0 = 0x4a3a2a, MOSS = 0x56693a;
+  for (let i = 0; i < 26; i++) reef.set(V10(x0) + i, Y0 + Math.round(i * 0.08), V10(z0), vary(W0, 0.08));
+  for (let rib = 0; rib < 7; rib++) {
+    const X = V10(x0) + 2 + rib * 4, hgt = rib === 3 ? 4 : 9 - Math.abs(rib - 3);
+    for (let s = -1; s <= 1; s += 2) for (let y = 0; y < hgt; y++) {
+      const zz = V10(z0) + s * Math.round(Math.sqrt(Math.max(0, 16 - (4 - y * 0.5) ** 2)) + 1);
+      reef.set(X, Y0 + y, zz, hash3(X, y, zz) < 0.3 ? MOSS : vary(W0, 0.1));
+    }
+  }
+  reef.line(V10(x0) + 10, Y0 + 1, V10(z0) - 1, V10(x0) + 30, Y0 + 10, V10(z0) - 8, 0x5c4630, 1);  // broken mast
+  PROPS.bubblers.push(new THREE.Vector3(x0 + 1.4, (Y0 + 4) * 0.1, z0));
+})();
+bottle.add(voxMesh(reef, 0.1));
+bottle.add(voxMesh(reefGlow, 0.1, glowMat, [0, 0, 0], false));
+
+// --- kelp forest (each stalk sways with a vertex shader) --------------------------
+const kelpMat = insideMaterial();
+{
+  const base = kelpMat.onBeforeCompile;
+  kelpMat.onBeforeCompile = (sh) => {
+    base(sh);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        float kw = max(position.y, 0.0); kw = kw * kw * 0.07;
+        transformed.x += sin(uTime * 1.1 + modelMatrix[3][0] * 1.7 + position.y * 0.9) * kw;
+        transformed.z += cos(uTime * 0.85 + modelMatrix[3][2] * 1.3 + position.y * 0.7) * kw * 0.7;`);
+  };
+}
+function kelp(x, z) {
+  if (!sandAt(x, z)) return;
+  const Y = gy(x, z), H = Math.min(capH(Y) - 3, ri(14, 26)); if (H < 6) return;
+  const m = new VoxelModel(), G = [0x6b8e23, 0x7fa83a, 0x557a2a, 0x8fb04a];
+  for (let y = 0; y < H; y++) {
+    m.set(0, y, 0, vary(0x5d7a26, 0.08));
+    if (y > 1 && y % 2 === 0) {
+      const s = (y / 2) % 2 ? 1 : -1, L = Math.round((1 - y / H) * 2 + 1.5), g = pick(G);
+      for (let q = 1; q <= L; q++) m.set(s * q, y + (q > 1 ? 1 : 0), 0, vary(g, 0.08));
+      m.set(s, y - 1, 0, 0xc2b24a);
+    }
+  }
+  const mesh = voxMesh(m, 0.1, kelpMat, [-0.5, 0, -0.5]);
+  mesh.position.set(x, Y * 0.1, z); mesh.rotation.y = rand() * TAU;
+  bottle.add(mesh);
+}
+for (let i = 0; i < 16; i++) kelp(-13.2 + rr(-1.4, 1.6), -2.4 + rr(-1.6, 1.8));
+for (let i = 0; i < 8; i++) kelp(6.6 + rr(-0.8, 0.6), 1.8 + rr(-1.2, 1.2));
+for (let i = 0; i < 10; i++) { const a = rand() * TAU, x = ISL.x + Math.cos(a) * ISL.ax * 1.75, z = ISL.z + Math.sin(a) * ISL.az * 1.75; kelp(x, z); }
+
+// =====================================================================
+//  THE GALLEON — built voxel by voxel (0.1 units). Local frame: +x bow,
+//  +y up, +z starboard, waterline at y = 0.
+// =====================================================================
+document.getElementById('loadmsg').textContent = 'rigging the galleon';
+U.uWave = { value: 1 };
+const flagMat = insideMaterial({ side: THREE.DoubleSide });
+{
+  const base = flagMat.onBeforeCompile;
+  flagMat.onBeforeCompile = (sh) => {
+    base(sh);
+    sh.uniforms.uWave = U.uWave = U.uWave || { value: 1 };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uTime; uniform float uWave;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        float fw = max(position.x, 0.0);
+        transformed.z += sin(uTime * (7.0 + uWave * 3.0) - position.x * 7.0 + modelMatrix[3][1] * 3.0) * fw * 0.14 * uWave;
+        transformed.y -= fw * fw * 0.08 / max(uWave, 0.6);`);
+  };
+}
+function buildShip() {
+  const hull = new VoxelModel(), glow = new VoxelModel();
+  const L0 = -24, L1 = 25;
+  const halfW = (i) => i > 8 ? 7.2 * Math.sqrt(Math.max(0, 1 - ((i - 8) / 18.5) ** 2)) : i < -16 ? 7.2 - (-16 - i) * 0.14 : 7.2;
+  const keelD = (i) => i > 13 ? 8 * Math.max(0.12, 1 - ((i - 13) / 13) ** 2) : i < -17 ? 8 - (-17 - i) * 0.55 : 8;
+  const deckH = (i) => (i < -17 ? 13 : i < -9 ? 10 : i > 14 ? 9 : 6);
+  const railH = (i) => deckH(i) + 3;
+  const PLANK = [0x9c7448, 0xb88a56, 0xa77d4c];
+  for (let i = L0; i <= L1; i++) {
+    const W0 = halfW(i), D = keelD(i), dk = deckH(i), top = railH(i);
+    for (let j = -Math.ceil(D) - 1; j <= top; j++) {
+      let w = j < 0 ? W0 * Math.sqrt(Math.max(0, 1 - (j / (D + 0.5)) ** 2)) : W0 * (1 - 0.1 * (j / 14) ** 2);
+      if (j < 0) w = Math.max(w, 0.6);
+      if (w < 0.5) continue;
+      const K = Math.ceil(w);
+      for (let k = -K; k < K; k++) {
+        const zc = Math.abs(k + 0.5); if (zc > w) continue;
+        const shell = zc > w - 1.05 || i === L0 || (i === L1 && j > 0);
+        if (j > dk && !shell) continue;
+        let c;
+        if (j > dk) c = j === top ? 0xe2b84a : (j === top - 1 && (i + k) % 4 === 0 ? 0xc79a35 : 0x1f4e8c);
+        else if (!shell && j === dk) c = PLANK[(k + 30) % 3];
+        else if (!shell) c = 0x3a2616;
+        else if (j < -1) c = 0x7b2d26;
+        else if (j <= 0) c = 0xe8dcc0;
+        else if (j <= 2) c = j % 2 ? 0x4a3020 : 0x553823;
+        else if (j === 3) c = 0x1e1712;
+        else if (j <= 5) c = (i % 6 === 0 || i % 6 === 1) && i > -16 && i < 16 ? 0x1b120c : 0xd29a3a;
+        else c = j === dk + 1 && i < -9 ? 0xe2b84a : 0x1f4e8c;
+        hull.set(i, j, k, vary(c, 0.05));
+      }
+      if (j === 4 && i % 6 === 0 && i > -16 && i < 16) for (const s of [-1, 1]) hull.set(i, 4, s > 0 ? K : -K - 1, 0x262626);   // cannons
+    }
+  }
+  // transom + quarter-gallery windows, gold carving
+  for (let k = -6; k < 6; k++) for (let j = 7; j <= 16; j++) {
+    if ((j === 8 || j === 9 || j === 12 || j === 13) && (k + 6) % 3 !== 2) glow.set(L0 - 1, j, k, 0xffcf6e);
+    else if (j === 10 || j === 14 || j === 16) hull.set(L0 - 1, j, k, 0xe2b84a);
+  }
+  for (let k = -5; k < 5; k += 2) hull.set(L0 - 1, 17, k, 0xe2b84a);
+  for (const s of [-1, 1]) for (let i = -23; i <= -19; i++) for (let j = 11; j <= 13; j++) {
+    const kk = s > 0 ? Math.ceil(halfW(i)) : -Math.ceil(halfW(i)) - 1;
+    if (i % 2) glow.set(i, j, kk, 0xffcf6e); else hull.set(i, j, kk, 0xe2b84a);
+  }
+  // lanterns on the taffrail
+  for (const [k, h] of [[-5, 17], [0, 19], [4, 17]]) {
+    hull.box(L0, h, k, L0, h + 1, k, 0x2b2b2b); glow.box(L0, h + 2, k, L0, h + 3, k, 0xffd46a); hull.set(L0, h + 4, k, 0x111111);
+  }
+  // bulkhead doors under the raised decks
+  for (const k of [-3, 2]) { glow.set(-10, 8, k, 0xffcf6e); hull.box(-10, 7, k, -10, 7, k, 0x3a2616); }
+  // hatches + gratings, wheel, capstan, cargo, rowboat
+  for (const hi of [-5, 5]) hull.box(hi, 7, -2, hi + 3, 7, 1, (a, b, c) => ((a + c) % 2 ? 0x2b1b10 : 0x8b6a40));
+  for (let a = 0; a < 12; a++) { const t = (a / 12) * TAU; hull.set(-12, 14 + Math.round(Math.sin(t) * 2.4), Math.round(Math.cos(t) * 2.4) - 1, 0x7b4f2a); }
+  hull.box(-12, 11, -1, -12, 14, -1, 0x5a3a20); hull.set(-12, 14, -1, 0xe2b84a);
+  hull.box(-3, 7, -1, -2, 9, 0, 0x6b4a2b);
+  for (const [bi, bk] of [[8, 3], [9, -4], [-7, 3], [-6, -5], [17, 2]]) hull.box(bi, dk2(bi), bk, bi + 1, dk2(bi) + 1, bk + 1, (a, b) => (b === dk2(bi) + 1 ? 0x3d2a1a : 0x8a5a2e));
+  function dk2(i) { return deckH(i) + 1; }
+  hull.box(1, 9, -3, 6, 9, 1, 0x7a5232); hull.box(1, 10, -3, 6, 10, -3, 0xf0ece0); hull.box(1, 10, 1, 6, 10, 1, 0xf0ece0);
+  // bowsprit, figurehead (a golden lion), anchors
+  hull.line(21, 9, -1, 37, 15, -1, 0x6b4a2b, 1); hull.line(37, 15, -1, 42, 17, -1, 0x5a3b22);
+  hull.ball(26, 6, -1, 2.2, (a, b, c) => vary(0xe9b949, 0.08)); hull.set(28, 7, -1, 0x2b1b10); hull.set(28, 7, -2, 0x2b1b10);
+  hull.ball(24, 5, -1, 2.6, (a, b, c) => vary(0xc98f2c, 0.08));
+  for (const s of [-1, 1]) { const kk = s > 0 ? 6 : -7; hull.box(17, 2, kk, 17, 8, kk, 0x34383d); hull.box(15, 2, kk, 19, 2, kk, 0x34383d); hull.set(15, 3, kk, 0x34383d); hull.set(19, 3, kk, 0x34383d); }
+  // masts with iron bands, tops and crow's nest
+  const MASTS = [{ i: 12, base: 6, top: 46, yards: [[16, 13], [28, 11], [38, 8]], topAt: 26 },
+    { i: 0, base: 6, top: 55, yards: [[18, 15], [32, 12], [45, 9]], topAt: 30 },
+    { i: -14, base: 10, top: 44, yards: [[27, 9], [37, 6]], topAt: 25 }];
+  for (const m of MASTS) {
+    for (let j = m.base; j <= m.top; j++) hull.box(m.i, j, -1, m.i + 1, j, 0, j % 7 === 0 ? 0x2a2a2a : vary(0x6b4a2b, 0.04));
+    hull.box(m.i - 2, m.topAt, -3, m.i + 3, m.topAt, 2, 0x5a3b22);
+    hull.box(m.i, m.top + 1, -1, m.i + 1, m.top + 1, 0, 0xe2b84a);
+  }
+  for (let a = 0; a < 16; a++) { const t = (a / 16) * TAU; hull.box(Math.round(Math.cos(t) * 2.5), 47, Math.round(Math.sin(t) * 2.5) - 1, Math.round(Math.cos(t) * 2.5), 48, Math.round(Math.sin(t) * 2.5) - 1, 0x6b4a2b); }
+  hull.box(-1, 46, -3, 2, 46, 2, 0x5a3b22);
+  // jibs + spanker (fore-and-aft sails, flat in the x-y plane)
+  const tri = (ax, ay, bx, by, cx, cy, col) => {
+    const minx = Math.min(ax, bx, cx), maxx = Math.max(ax, bx, cx), miny = Math.min(ay, by, cy), maxy = Math.max(ay, by, cy);
+    const s = (px, py, qx, qy, rx, ry) => (px - rx) * (qy - ry) - (qx - rx) * (py - ry);
+    for (let x = minx; x <= maxx; x++) for (let y = miny; y <= maxy; y++) {
+      const d1 = s(x, y, ax, ay, bx, by), d2 = s(x, y, bx, by, cx, cy), d3 = s(x, y, cx, cy, ax, ay);
+      if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) hull.set(x, y, -1 + Math.round(Math.sin(((x - minx) / (maxx - minx + 1)) * Math.PI) * 1.4), (x + y) % 9 === 0 ? 0xe2d6b8 : vary(col, 0.03));
+    }
+  };
+  tri(36, 15, 14, 42, 20, 11, 0xf3ead2); tri(29, 13, 14, 32, 18, 10, 0xf6eedb);
+  for (let x = -27; x <= -15; x++) { const t = (x + 27) / 12, y0 = 14, y1 = Math.round(lerp(28, 38, t)); for (let y = y0; y <= y1; y++) hull.set(x, y, -1, (y % 5 === 0) ? 0xe2d6b8 : vary(0xf0e4c8, 0.03)); }
+  hull.line(-15, 38, -1, -28, 29, -1, 0x5a3b22); hull.line(-15, 14, -1, -28, 14, -1, 0x5a3b22);
+  // crew (stylised, a bit oversized so they read from afar)
+  const sailor = (i, j, k, hat) => { hull.set(i, j, k, 0x2c3e6b); hull.set(i, j + 1, k, 0xf2f2f2); hull.set(i, j + 2, k, 0xc23b32); hull.set(i, j + 3, k, 0xf0c39a); hull.set(i, j + 4, k, hat); };
+  sailor(6, 7, 4, 0xc23b32); sailor(-6, 7, -5, 0x1b1b1b); sailor(-11, 11, -3, 0x111111); sailor(15, 10, -3, 0x2c5f9e); sailor(1, 47, 1, 0xc23b32);
+  return { hull, glow, MASTS, L0 };
+}
+
+function buildRig(m, idx) {
+  const rig = new VoxelModel();
+  const SAIL = 0xf3ead2, SEAM = 0xe2d6b8;
+  const ys = m.yards;
+  ys.forEach(([y, hl], n) => {
+    for (let k = -hl; k < hl; k++) rig.set(1, y, k, Math.abs(k + 0.5) > hl - 1.5 ? 0x3a2616 : 0x5a3b22);
+    const yb = n === 0 ? m.base + 5 : ys[n - 1][0], hb = n === 0 ? hl - 1 : ys[n - 1][1];
+    const B = n === 0 ? 4.5 : n === 1 ? 3.4 : 2.4;
+    for (let yy = yb + 1; yy < y; yy++) {
+      const v = (yy - yb) / (y - yb), half = Math.round(lerp(hb, hl, v));
+      for (let k = -half; k < half; k++) {
+        const u = (k + 0.5) / half, bil = B * (1 - u * u) * (0.6 + 0.4 * Math.sin(Math.PI * v));
+        let c = (k + 40) % 4 === 0 ? SEAM : SAIL;
+        if (idx === 1 && n === 0) { const d = Math.hypot(u * 1.25, (v - 0.5) * 2.2); if (d < 0.5) c = d < 0.18 ? 0xe2b84a : (Math.atan2(v - 0.5, u) * 8 / Math.PI + 16) % 2 < 1 ? 0xc8342c : 0xe25b3c; else if (d < 0.56) c = 0xe2b84a; }
+        if (idx === 0 && n === 0 && ((v > 0.14 && v < 0.24) || (v > 0.74 && v < 0.84))) c = 0xc8342c;
+        if (idx === 1 && n === 1 && v < 0.14) c = 0x1f4e8c;
+        if (idx === 2 && n === 0 && Math.abs(u) < 0.12) c = 0xc8342c;
+        const ox = 2 + Math.round(bil);
+        rig.set(ox, yy, k, vary(c, 0.025)); rig.set(ox - 1, yy, k, vary(shade(c, 0.94), 0.025));
+      }
+    }
+  });
+  return rig;
+}
+
+function buildFlag(kind) {
+  const f = new VoxelModel();
+  if (kind === 'jolly') {
+    const ART = ['..............', '.....####.....', '....######....', '....#.##.#....', '....######....', '.....#..#.....', '..#........#..', '...##....##...', '.....####.....', '...##....##...', '..#........#..'];
+    ART.forEach((row, r) => [...row].forEach((ch, c) => f.set(c, 10 - r, 0, ch === '#' ? 0xf4f1e8 : 0x15151a)));
+  } else {
+    for (let x = 0; x < 22; x++) { const w = Math.max(1, Math.round(2.5 * (1 - x / 22))); for (let y = 0; y < w; y++) f.set(x, -y, 0, (x >> 2) % 2 ? 0xf4f1e8 : 0xc8342c); }
+  }
+  return voxMesh(f, 0.1, flagMat, [0, 0, -0.5], true);
+}
+
+// =====================================================================
+//  SHIP PHYSICS — planar rigid body (sail thrust, keel drag, rudder yaw,
+//  downhill force on a sloshing sea, grounding) + buoyancy-driven heave,
+//  pitch and roll from the sampled wave surface, heel from wind & turning.
+// =====================================================================
+const PATHD = { cx: -4.0, cz: 0, a: 5.0, r: 4.3 };
+PATHD.P = 4 * PATHD.a + TAU * PATHD.r;
+function pathPt(s, out) {
+  const { cx, cz, a, r, P } = PATHD; s = ((s % P) + P) % P;
+  if (s < 2 * a) return out.set(cx - a + s, cz + r);
+  s -= 2 * a;
+  if (s < Math.PI * r) { const t = s / r; return out.set(cx + a + r * Math.sin(t), cz + r * Math.cos(t)); }
+  s -= Math.PI * r;
+  if (s < 2 * a) return out.set(cx + a - s, cz - r);
+  s -= 2 * a; const t = s / r; return out.set(cx - a - r * Math.sin(t), cz - r * Math.cos(t));
+}
+// air inside a closed bottle circulates: a gentle gyre around the island (+ gusts)
+const WIND = { str: 1, base: 1 };
+function windAt(x, z, out) {
+  const { cx, cz, a } = PATHD, dx = x - clamp(x, cx - a, cx + a), dz = z - cz, l = Math.hypot(dx, dz) || 1;
+  return out.set((dz / l) * WIND.str, (-dx / l) * WIND.str);
+}
+const wrapA = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+const ship = (() => {
+  const B = buildShip();
+  const group = new THREE.Group();
+  group.add(voxMesh(B.hull, 0.1));
+  group.add(voxMesh(B.glow, 0.1, glowMat, [0, 0, 0], false));
+  const rigs = B.MASTS.map((m, idx) => {
+    const pivot = new THREE.Group(); pivot.position.set((m.i + 1) * 0.1, 0, 0);
+    const mesh = voxMesh(buildRig(m, idx), 0.1); pivot.add(mesh); group.add(pivot);
+    return { pivot, mesh, ph: idx * 1.7 };
+  });
+  const flags = [];
+  const addFlag = (kind, mi, y) => { const pv = new THREE.Group(); pv.position.set((B.MASTS[mi].i + 1) * 0.1, y, 0); pv.add(buildFlag(kind)); group.add(pv); flags.push(pv); };
+  addFlag('jolly', 1, (B.MASTS[1].top - 10) * 0.1); addFlag('pennant', 0, B.MASTS[0].top * 0.1); addFlag('pennant', 2, B.MASTS[2].top * 0.1);
+  // rigging lines (shrouds + stays)
+  const pts = [];
+  const L = (a, b) => pts.push(a[0] * 0.1, a[1] * 0.1, a[2] * 0.1, b[0] * 0.1, b[1] * 0.1, b[2] * 0.1);
+  for (const m of B.MASTS) {
+    const cx = m.i + 1;
+    for (const s of [-1, 1]) for (let d = -3; d <= 1; d += 2) { L([cx, m.topAt, s * 3], [cx + d, m.base + 3, s * 7.4]); L([cx, m.top - 2, 0], [cx + d * 0.5, m.topAt, s * 3]); }
+  }
+  L([B.MASTS[0].i + 1, B.MASTS[0].top, 0], [40, 16.5, -0.5]); L([B.MASTS[0].i + 1, B.MASTS[0].topAt + 6, 0], [36, 15, -0.5]);
+  L([B.MASTS[1].i + 1, B.MASTS[1].top, 0], [B.MASTS[0].i + 1, B.MASTS[0].topAt, 0]); L([B.MASTS[2].i + 1, B.MASTS[2].top, 0], [B.MASTS[1].i + 1, B.MASTS[1].topAt, 0]);
+  L([B.MASTS[2].i + 1, B.MASTS[2].top, 0], [-24, 16, 0]);
+  const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+  group.add(new THREE.LineSegments(rg, new THREE.LineBasicMaterial({ color: 0x2a1d12, transparent: true, opacity: 0.85 })));
+  const lantern = new THREE.PointLight(0xffb15a, 0, 7, 1.5); lantern.position.set(-2.6, 2.0, 0); group.add(lantern);
+  bottle.add(group);
+
+  const st = { s: 0, x: 0, z: 0, psi: 0, r: 0, vel: new THREE.Vector2(), y: WL, vy: 0, pitch: 0, vp: 0, roll: 0, vr: 0, speed: 0, wakeT: 0, prevBowRel: 0 };
+  const tmp = new THREE.Vector2(), tgt = new THREE.Vector2(), w = new THREE.Vector2(), g = new THREE.Vector2(), fwd = new THREE.Vector2(), side = new THREE.Vector2();
+  pathPt(0, tmp); st.x = tmp.x; st.z = tmp.y; st.psi = 0;
+  const api = {
+    group, st, fwd, side, lantern, rigs, flags,
+    pos: new THREE.Vector3(),
+    kick(roll, pitch, heave) { st.vr += roll; st.vp += pitch; st.vy += heave; },
+    update(dt, t, storm) {
+      // --- guidance: pure pursuit along the race-track around the island
+      let best = st.s, bd = 1e9;
+      for (let k = -15; k <= 30; k++) { const s = st.s + k * 0.1; pathPt(s, tmp); const d = (tmp.x - st.x) ** 2 + (tmp.y - st.z) ** 2; if (d < bd) { bd = d; best = s; } }
+      st.s = best; pathPt(best + 2.6, tgt);
+      const e = wrapA(Math.atan2(-(tgt.y - st.z), tgt.x - st.x) - st.psi);
+      fwd.set(Math.cos(st.psi), -Math.sin(st.psi)); side.set(Math.sin(st.psi), Math.cos(st.psi));
+      const u = st.vel.dot(fwd), v = st.vel.dot(side);
+      st.r += (2.4 * e * clamp(Math.abs(u), 0.25, 1.4) - 2.2 * st.r) * dt;
+      st.psi = wrapA(st.psi + st.r * dt);
+      // --- forces: sails, hull drag (keel resists sideways motion), downhill slope
+      windAt(st.x, st.z, w);
+      const wA = w.dot(fwd), wS = w.dot(side);
+      const T = 0.9 * Math.max(0.35 * WIND.str, wA) * (1 + 0.12 * Math.sin(t * 0.7));
+      const au = T - 0.75 * u * Math.abs(u) - 0.1 * u, av = -3.2 * v * Math.abs(v) - 1.6 * v + 0.12 * wS;
+      ocean.gradAt(st.x, st.z, g);
+      st.vel.x += (fwd.x * au + side.x * av - g.x * 4.5) * dt;
+      st.vel.y += (fwd.y * au + side.y * av - g.y * 4.5) * dt;
+      // --- collisions: grounding on shoals and the curved glass
+      for (const off of [2.2, 0, -2.2]) {
+        const px = st.x + fwd.x * off, pz = st.z + fwd.y * off, th = terrainH(px, pz);
+        if (th > WL - 0.8) {
+          const gx = terrainH(px + 0.2, pz) - terrainH(px - 0.2, pz), gz = terrainH(px, pz + 0.2) - terrainH(px, pz - 0.2), l = Math.hypot(gx, gz) || 1;
+          const push = Math.min(3, (th - (WL - 0.8)) * 6);
+          st.vel.x -= (gx / l) * push * dt * 6; st.vel.y -= (gz / l) * push * dt * 6;
+        }
+        const half = Math.sqrt(innerR(px) ** 2 - WL * WL) - 1.0;
+        if (Math.abs(pz) > half) st.vel.y -= Math.sign(pz) * (Math.abs(pz) - half) * dt * 20;
+        if (px < X_BASE + 1.6) st.vel.x += (X_BASE + 1.6 - px) * dt * 20;
+      }
+      st.x += st.vel.x * dt; st.z += st.vel.y * dt;
+      st.speed = st.vel.length();
+      // --- buoyancy: chase the local wave plane with spring-dampers
+      const hB = ocean.heightAt(st.x + fwd.x * 2.2, st.z + fwd.y * 2.2), hS = ocean.heightAt(st.x - fwd.x * 2.2, st.z - fwd.y * 2.2);
+      const hP = ocean.heightAt(st.x - side.x * 0.7, st.z - side.y * 0.7), hR = ocean.heightAt(st.x + side.x * 0.7, st.z + side.y * 0.7);
+      const hC = ocean.heightAt(st.x, st.z);
+      const hm = (hB + hS + hP + hR + 2 * hC) / 6 - 0.04;
+      const heel = clamp(wS * 0.09 + u * st.r * 0.3, -0.35, 0.35);
+      st.vy += (32 * (hm - st.y) - 6.5 * st.vy) * dt; st.y += st.vy * dt;
+      st.vp += (16 * (Math.atan2(hB - hS, 4.4) * 0.85 - st.pitch) - 3.6 * st.vp) * dt; st.pitch += st.vp * dt;
+      st.vr += (6.5 * (Math.atan2(hP - hR, 1.4) * 0.6 + heel - st.roll) - 1.3 * st.vr) * dt; st.roll += st.vr * dt;
+      group.position.set(st.x, st.y, st.z);
+      group.rotation.set(st.roll, st.psi, st.pitch, 'YZX');
+      this.pos.set(st.x, st.y, st.z);
+      // --- sails brace to the apparent wind, billow with its strength; flags stream downwind
+      const awx = w.x - st.vel.x * 0.5, awz = w.y - st.vel.y * 0.5;
+      const fa = Math.atan2(-(awx * side.x + awz * side.y), awx * fwd.x + awz * fwd.y);   // apparent wind, ship frame
+      const brace = clamp(fa, -0.45, 0.45) * 0.6;
+      for (const R of rigs) {
+        R.pivot.rotation.y = lerp(R.pivot.rotation.y, brace, dt * 1.5);
+        R.mesh.scale.x = 0.8 + 0.22 * Math.min(1.6, WIND.str) + 0.04 * Math.sin(t * (3 + storm * 5) + R.ph);
+      }
+      for (const f of flags) f.rotation.y = lerp(f.rotation.y, fa, dt * 3);
+      // --- wake, foam, bow spray
+      const bx = st.x + fwd.x * 2.4, bz = st.z + fwd.y * 2.4;
+      st.wakeT += dt;
+      if (st.wakeT > 0.05) {
+        st.wakeT = 0;
+        ocean.disturb(bx, bz, 0.03 * st.speed, 0.35);
+        ocean.addFoam(st.x - fwd.x * 2.3, st.z - fwd.y * 2.3, 0.45, 0.45);
+        for (const s of [-1, 1]) ocean.addFoam(bx - fwd.x * 0.4 + side.x * 0.55 * s, bz - fwd.y * 0.4 + side.y * 0.55 * s, 0.3, 0.25);
+      }
+      const bowY = st.y + Math.sin(st.pitch) * 2.3, bowRel = bowY - hB, dRel = (bowRel - st.prevBowRel) / Math.max(dt, 1e-3);
+      st.prevBowRel = bowRel;
+      if (bowRel < 0.12 && dRel < -0.25 && Math.random() < 0.6) fx.spray(bx, hB + 0.05, bz, fwd.x, fwd.y, Math.min(1.5, -dRel * 0.7 + storm * 0.5));
+      if (storm > 0.3 && Math.random() < storm * 0.25) fx.spray(bx, hB + 0.05, bz, fwd.x, fwd.y, 0.6);
+    },
+  };
+  return api;
+})();
+
+// =====================================================================
+//  PARTICLES — voxel cubes with real ballistics: gravity, drag, buoyancy,
+//  and collisions with the sea surface, the land and the curved glass
+// =====================================================================
+const P_SPLASH = 0, P_SMOKE = 1, P_EMBER = 2, P_FIRE = 3, P_RAIN = 4, P_STEAM = 5, P_BUBBLE = 6, P_FLY = 7;
+const fx = (() => {
+  const MAX = 4500;
+  const box = new THREE.BoxGeometry(1, 1, 1), geo = new THREE.InstancedBufferGeometry();
+  geo.index = box.index; geo.setAttribute('position', box.getAttribute('position')); geo.setAttribute('normal', box.getAttribute('normal'));
+  const aPos = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 4), 4).setUsage(THREE.DynamicDrawUsage);
+  const aCol = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 4), 4).setUsage(THREE.DynamicDrawUsage);
+  const aRot = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 2), 2).setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('iPos', aPos); geo.setAttribute('iCol', aCol); geo.setAttribute('iRot', aRot);
+  geo.instanceCount = 0;
+  const uniforms = { uSun: { value: new THREE.Vector3(0, 1, 0) }, uAmb: { value: 0.6 }, uLight: { value: 1 } };
+  const mat = new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, uniforms,
+    vertexShader: `attribute vec4 iPos; attribute vec4 iCol; attribute vec2 iRot; uniform vec3 uSun; uniform float uAmb, uLight;
+      varying vec4 vC; varying float vL;
+      vec3 rot(vec3 v, float a){ float c = cos(a), s = sin(a); v = vec3(c*v.x - s*v.z, v.y, s*v.x + c*v.z); return vec3(v.x, c*v.y - s*v.z, s*v.y + c*v.z); }
+      void main(){
+        vec3 p = rot(position * iPos.w, iRot.x); vec3 n = rot(normal, iRot.x);
+        vec4 wp = modelMatrix * vec4(p + iPos.xyz, 1.0);
+        float lit = (uAmb + max(dot(normalize(mat3(modelMatrix) * n), uSun), 0.0) * (1.0 - uAmb)) * uLight;
+        vL = mix(lit, 1.0, iRot.y); vC = iCol;
+        gl_Position = projectionMatrix * viewMatrix * wp; }`,
+    fragmentShader: `varying vec4 vC; varying float vL; void main(){ gl_FragColor = vec4(vC.rgb * vL, vC.a); }`,
+  });
+  const mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false; mesh.renderOrder = 6;
+  bottle.add(mesh);
+  const F = (n) => new Float32Array(n);
+  const px = F(MAX), py = F(MAX), pz = F(MAX), vx = F(MAX), vy = F(MAX), vz = F(MAX), life = F(MAX), ml = F(MAX), s0 = F(MAX), s1 = F(MAX);
+  const cr = F(MAX), cg = F(MAX), cb = F(MAX), ca = F(MAX), em = F(MAX), rt = F(MAX), rv = F(MAX), typ = new Uint8Array(MAX);
+  let n = 0;
+  function emit(t, x, y, z, ux, uy, uz, L, a, b, col, alpha, emi = 0) {
+    if (n >= MAX) return -1;
+    const i = n++;
+    typ[i] = t; px[i] = x; py[i] = y; pz[i] = z; vx[i] = ux; vy[i] = uy; vz[i] = uz; life[i] = 0; ml[i] = L; s0[i] = a; s1[i] = b;
+    cr[i] = col[0]; cg[i] = col[1]; cb[i] = col[2]; ca[i] = alpha; em[i] = emi; rt[i] = rand() * TAU; rv[i] = rr(-4, 4);
+    return i;
+  }
+  function kill(i) {
+    const j = --n; if (i === j) return;
+    px[i] = px[j]; py[i] = py[j]; pz[i] = pz[j]; vx[i] = vx[j]; vy[i] = vy[j]; vz[i] = vz[j]; life[i] = life[j]; ml[i] = ml[j]; s0[i] = s0[j]; s1[i] = s1[j];
+    cr[i] = cr[j]; cg[i] = cg[j]; cb[i] = cb[j]; ca[i] = ca[j]; em[i] = em[j]; rt[i] = rt[j]; rv[i] = rv[j]; typ[i] = typ[j];
+  }
+  const WATER = [0.85, 0.95, 1.0], FOAMC = [1.0, 1.0, 1.0], SMOKE = [0.36, 0.34, 0.36], STEAM = [0.92, 0.94, 0.96];
+  const api = {
+    uniforms,
+    get count() { return n; },
+    splash(x, z, k = 1, y) {
+      const h = y ?? ocean.heightAt(x, z), cnt = Math.min(60, Math.round(14 * k));
+      for (let i = 0; i < cnt; i++) {
+        const a = rand() * TAU, sp = rr(0.4, 1.6) * Math.sqrt(k);
+        emit(P_SPLASH, x + Math.cos(a) * 0.1, h, z + Math.sin(a) * 0.1, Math.cos(a) * sp, rr(1.8, 3.6) * Math.sqrt(k), Math.sin(a) * sp, 2.5, rr(0.05, 0.11), 0.03, rand() < 0.4 ? FOAMC : WATER, 0.92);
+      }
+      ocean.addFoam(x, z, 0.8 * k, 0.3 + 0.2 * k);
+    },
+    spray(x, y, z, fx0, fz0, k = 1) {
+      const cnt = Math.round(5 * k);
+      for (let i = 0; i < cnt; i++) {
+        const side = rand() < 0.5 ? -1 : 1, sp = rr(0.5, 1.4) * k;
+        emit(P_SPLASH, x, y, z, fx0 * sp * 0.8 + -fz0 * side * sp, rr(1.2, 2.6) * k, fz0 * sp * 0.8 + fx0 * side * sp, 2, rr(0.04, 0.08), 0.02, rand() < 0.5 ? FOAMC : WATER, 0.9);
+      }
+    },
+    smoke(x, y, z, k = 1, dark = true) { emit(P_SMOKE, x + rr(-0.1, 0.1), y, z + rr(-0.1, 0.1), rr(-0.15, 0.15), rr(0.5, 0.9), rr(-0.15, 0.15), rr(9, 14), rr(0.12, 0.2) * k, rr(0.5, 0.8) * k, dark ? SMOKE : STEAM, dark ? 0.55 : 0.4); },
+    steam(x, y, z) { emit(P_STEAM, x + rr(-0.15, 0.15), y, z + rr(-0.15, 0.15), rr(-0.1, 0.1), rr(0.4, 0.8), rr(-0.1, 0.1), rr(1.2, 2.2), 0.08, 0.35, STEAM, 0.5); },
+    ember(x, y, z, ux, uy, uz) { emit(P_EMBER, x, y, z, ux, uy, uz, 6, rr(0.06, 0.12), 0.04, [4.0, rr(1.0, 1.8), 0.25], 1, 1); },
+    fire(x, y, z) { emit(P_FIRE, x + rr(-0.07, 0.07), y, z + rr(-0.07, 0.07), rr(-0.05, 0.05), rr(0.3, 0.6), rr(-0.05, 0.05), rr(0.5, 0.9), rr(0.05, 0.08), 0.01, [3.2, rr(1.0, 2.0), 0.3], 1, 1); },
+    rain(x, y, z) { emit(P_RAIN, x, y, z, WIND.str * 0.3, -rr(5, 7), 0, 3, 0.035, 0.035, [0.75, 0.85, 1.0], 0.75); },
+    bubble(x, y, z) { emit(P_BUBBLE, x + rr(-0.05, 0.05), y, z + rr(-0.05, 0.05), 0, rr(0.3, 0.6), 0, 20, rr(0.03, 0.07), 0.08, [0.8, 0.95, 1.0], 0.55); },
+    firefly(x, y, z) { emit(P_FLY, x, y, z, rr(-0.2, 0.2), rr(-0.1, 0.1), rr(-0.2, 0.2), rr(6, 12), 0.035, 0.035, [2.2, 3.0, 0.8], 1, 1); },
+    update(dt) {
+      const P = aPos.array, Cc = aCol.array, Rr = aRot.array;
+      for (let i = n - 1; i >= 0; i--) {
+        life[i] += dt;
+        if (life[i] > ml[i]) { kill(i); continue; }
+        const t = typ[i];
+        let ax = 0, ay = 0, az = 0, drag = 0;
+        if (t === P_SPLASH || t === P_EMBER || t === P_RAIN) { ay = -9.8; drag = 0.15; }
+        else if (t === P_SMOKE) { ay = 0.35; drag = 0.9; ax = WIND.str * 0.08; }
+        else if (t === P_STEAM) { ay = 0.6; drag = 1.2; }
+        else if (t === P_FIRE) { ay = 1.4; drag = 1.5; }
+        else if (t === P_BUBBLE) { ay = 0.6; drag = 2.5; ax = Math.sin(life[i] * 7 + i) * 0.4; }
+        else if (t === P_FLY) { ax = rr(-1, 1); ay = rr(-0.8, 0.8); az = rr(-1, 1); drag = 1.2; }
+        const d = Math.exp(-drag * dt);
+        vx[i] = (vx[i] + ax * dt) * d; vy[i] = (vy[i] + ay * dt) * d; vz[i] = (vz[i] + az * dt) * d;
+        px[i] += vx[i] * dt; py[i] += vy[i] * dt; pz[i] += vz[i] * dt;
+        rt[i] += rv[i] * dt;
+        const x = px[i], y = py[i], z = pz[i];
+        // collisions -------------------------------------------------------
+        if (t === P_SPLASH || t === P_RAIN || t === P_EMBER) {
+          if (vy[i] < 0) {
+            const wet = ocean.isWet(x, z), hs = wet ? ocean.heightAt(x, z) : terrainH(x, z);
+            if (y < hs) {
+              if (wet) {
+                if (t === P_RAIN) { ocean.disturb(x, z, 0.02, 0.22); if (rand() < 0.15) emit(P_SPLASH, x, hs, z, rr(-0.4, 0.4), rr(0.8, 1.4), rr(-0.4, 0.4), 1, 0.03, 0.02, WATER, 0.8); }
+                else if (t === P_EMBER) { ocean.disturb(x, z, 0.05, 0.25); for (let k = 0; k < 4; k++) api.steam(x, hs, z); }
+                else if (s0[i] > 0.08 && rand() < 0.3) ocean.disturb(x, z, 0.01, 0.2);
+              }
+              kill(i); continue;
+            }
+          }
+        } else if (t === P_BUBBLE) {
+          if (y > ocean.heightAt(x, z) - 0.05) { ocean.disturb(x, z, 0.006, 0.2); kill(i); continue; }
+        }
+        if (t === P_SMOKE || t === P_STEAM || t === P_FLY || t === P_FIRE) {   // trapped by the glass
+          const R = innerR(x) - 0.12 - s1[i] * 0.4, rad = Math.hypot(y, z);
+          if (rad > R) {
+            const ny = y / rad, nz = z / rad, vn = vy[i] * ny + vz[i] * nz;
+            py[i] = ny * R; pz[i] = nz * R;
+            if (vn > 0) { vy[i] -= vn * ny * 1.2; vz[i] -= vn * nz * 1.2; }
+          }
+          if (px[i] < X_BASE + 0.5) { px[i] = X_BASE + 0.5; vx[i] = Math.abs(vx[i]) * 0.3; }
+          if (px[i] > X_NECK + 2.5) { px[i] = X_NECK + 2.5; vx[i] = -Math.abs(vx[i]) * 0.3; }
+        }
+        // write instance ------------------------------------------------
+        const u = life[i] / ml[i], o = i * 4;
+        P[o] = px[i]; P[o + 1] = py[i]; P[o + 2] = pz[i]; P[o + 3] = lerp(s0[i], s1[i], u);
+        let a = ca[i];
+        if (t === P_SMOKE) a *= Math.min(1, u * 6) * (1 - u) ** 1.5;
+        else if (t === P_STEAM || t === P_FIRE) a *= 1 - u;
+        else if (t === P_FLY) a *= Math.sin(Math.PI * u) * (0.5 + 0.5 * Math.sin(life[i] * 6 + i));
+        Cc[o] = cr[i]; Cc[o + 1] = cg[i]; Cc[o + 2] = cb[i]; Cc[o + 3] = a;
+        Rr[i * 2] = rt[i]; Rr[i * 2 + 1] = em[i];
+      }
+      geo.instanceCount = n;
+      aPos.needsUpdate = aCol.needsUpdate = aRot.needsUpdate = true;
+    },
+  };
+  return api;
+})();
+
+// =====================================================================
+//  LIGHTNING — a jagged chain of glowing voxels from cloud to sea
+// =====================================================================
+const lightning = (() => {
+  const MAXB = 400;
+  const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(6, 6.5, 9), toneMapped: true, transparent: true });
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, 0.07, 0.07), mat, MAXB);
+  mesh.count = 0; mesh.frustumCulled = false; mesh.renderOrder = 7; bottle.add(mesh);
+  const light = new THREE.PointLight(0xbfd4ff, 0, 30, 1.2); bottle.add(light);
+  const m4 = new THREE.Matrix4();
+  let t = 0, dur = 0;
+  return {
+    light,
+    get flash() { return dur > 0 ? Math.max(0, 1 - t / dur) * (0.6 + 0.4 * Math.sin(t * 90)) : 0; },
+    strike(x0, y0, z0) {
+      let x = x0, y = y0, z = z0, c = 0;
+      const ty = ocean.heightAt(x0, z0), pts = [];
+      const walk = (x, y, z, n, branch) => {
+        while (y > ty && c < MAXB && n-- > 0) {
+          const nx = x + rr(-0.12, 0.12), ny = y - rr(0.05, 0.12), nz = z + rr(-0.12, 0.12);
+          const steps = 2;
+          for (let s = 1; s <= steps && c < MAXB; s++) { m4.makeTranslation(lerp(x, nx, s / steps), lerp(y, ny, s / steps), lerp(z, nz, s / steps)); mesh.setMatrixAt(c++, m4); }
+          x = nx; y = ny; z = nz;
+          if (!branch && rand() < 0.06) walk(x, y, z, ri(5, 12), true);
+        }
+        return [x, z];
+      };
+      const [hx, hz] = walk(x, y, z, 999, false);
+      mesh.count = c; mesh.instanceMatrix.needsUpdate = true;
+      t = 0; dur = 0.45; light.position.set(hx, ty + 1.2, hz);
+      if (ocean.isWet(hx, hz)) { ocean.disturb(hx, hz, 0.35, 0.6); fx.splash(hx, hz, 2.2); for (let i = 0; i < 12; i++) fx.steam(hx, ty, hz); }
+      AUDIO.thunder();
+    },
+    update(dt) {
+      if (dur <= 0) return;
+      t += dt; const f = this.flash;
+      mat.opacity = f > 0.05 ? 1 : 0; light.intensity = f * 60;
+      if (t > dur) { dur = 0; mesh.count = 0; light.intensity = 0; }
+    },
+  };
+})();
+
+// =====================================================================
+//  SEA LIFE — boid fish schools, leaping dolphins, a sea turtle
+// =====================================================================
+document.getElementById('loadmsg').textContent = 'releasing the fish';
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(0, 0, 0, 'YZX'), _s = new THREE.Vector3(1, 1, 1), _p = new THREE.Vector3();
+const SCARE = { x: 0, y: 0, z: 0, t: -99 };
+const inWater = (x, y, z) => y < Y_BODY - 0.15 && y > floorAt(x, z) + 0.3 && Math.hypot(y, z) < innerR(x) - 0.35 && x > X_BASE + 0.8 && x < 8.0;
+
+const fishSchools = (() => {
+  const m = new VoxelModel();
+  const prof = [0.5, 1, 1.5, 2, 2, 2, 1.5, 1];
+  prof.forEach((r, i) => { const x = i - 4; for (let y = -2; y <= 2; y++) for (let z = -1; z <= 1; z++) if ((y * y) / (r * r + 0.01) + (z * z) / Math.max(0.6, r * 0.6) <= 1.05) m.set(x, y, z, y < 0 ? 0xffffff : (x === -1 || x === 2) ? 0x9a9a9a : 0xe8e8e8); });
+  m.set(3, 1, -1, 0x111111); m.set(3, 1, 1, 0x111111);
+  for (const [x, y] of [[-5, 0], [-6, 1], [-6, -1], [-7, 2], [-7, -2], [-6, 0]]) m.set(x, y, 0, 0xdddddd);
+  m.set(0, 3, 0, 0xcccccc); m.set(-1, 3, 0, 0xcccccc); m.set(-2, 2, 0, 0xcccccc);
+  const geo = m.geometry(0.042, [-0.5, -0.5, -0.5]);
+  const SCH = [{ c: 0xff8a2a, n: 20 }, { c: 0x2f6fe0, n: 18 }, { c: 0xffd23f, n: 16 }, { c: 0xf15bb5, n: 10 }];
+  const total = SCH.reduce((s, a) => s + a.n, 0);
+  const mesh = new THREE.InstancedMesh(geo, voxMat, total);
+  mesh.castShadow = true; mesh.frustumCulled = false; bottle.add(mesh);
+  const F = [];
+  const randWater = (out) => { for (let k = 0; k < 60; k++) { const x = rr(-14, 7.5), z = rr(-5.5, 5.5), y = rr(-5, -2.7); if (inWater(x, y, z)) return out.set(x, y, z); } return out.set(-8, -3.6, -3); };
+  const schools = SCH.map((s, si) => ({ tgt: randWater(new THREE.Vector3()), timer: rr(3, 8), members: [] }));
+  let idx = 0;
+  SCH.forEach((s, si) => {
+    const col = new THREE.Color(s.c);
+    for (let i = 0; i < s.n; i++) {
+      const f = { pos: schools[si].tgt.clone().add(new THREE.Vector3(rr(-0.6, 0.6), rr(-0.3, 0.3), rr(-0.6, 0.6))), vel: new THREE.Vector3(rr(-1, 1), 0, rr(-1, 1)), si, i: idx, ph: rand() * TAU };
+      mesh.setColorAt(idx++, col.clone().offsetHSL(rr(-0.03, 0.03), 0, rr(-0.08, 0.08)));
+      F.push(f); schools[si].members.push(f);
+    }
+  });
+  const acc = new THREE.Vector3(), tmp = new THREE.Vector3();
+  return {
+    update(dt, t) {
+      for (const s of schools) { s.timer -= dt; if (s.timer < 0 || s.members[0].pos.distanceTo(s.tgt) < 0.6) { randWater(s.tgt); s.timer = rr(5, 10); } }
+      for (const f of F) {
+        acc.set(0, 0, 0);
+        const sc = schools[f.si];
+        let nN = 0; const coh = tmp.set(0, 0, 0), ali = new THREE.Vector3(), sep = new THREE.Vector3();
+        for (const o of sc.members) {
+          if (o === f) continue;
+          const dx = o.pos.x - f.pos.x, dy = o.pos.y - f.pos.y, dz = o.pos.z - f.pos.z, d2 = dx * dx + dy * dy + dz * dz;
+          if (d2 > 1.0) continue;
+          nN++; coh.x += dx; coh.y += dy; coh.z += dz; ali.add(o.vel);
+          if (d2 < 0.04) { sep.x -= dx / (d2 + 0.01); sep.y -= dy / (d2 + 0.01); sep.z -= dz / (d2 + 0.01); }
+        }
+        if (nN) { acc.addScaledVector(coh, 1.2 / nN); acc.addScaledVector(ali.divideScalar(nN).sub(f.vel), 0.9); }
+        acc.addScaledVector(sep, 0.025);
+        acc.x += (sc.tgt.x - f.pos.x) * 0.35; acc.y += (sc.tgt.y - f.pos.y) * 0.35; acc.z += (sc.tgt.z - f.pos.z) * 0.35;
+        const p = f.pos, fl = floorAt(p.x + f.vel.x * 0.4, p.z + f.vel.z * 0.4);
+        if (p.y < fl + 0.45) acc.y += (fl + 0.45 - p.y) * 14;
+        if (p.y > Y_BODY - 0.25) acc.y -= (p.y - Y_BODY + 0.25) * 14;
+        const rad = Math.hypot(p.y, p.z), R = innerR(p.x) - 0.5;
+        if (rad > R) { acc.y -= (p.y / rad) * (rad - R) * 12; acc.z -= (p.z / rad) * (rad - R) * 12; }
+        if (p.x < X_BASE + 1) acc.x += 6; if (p.x > 7.6) acc.x -= 6;
+        if (t - SCARE.t < 2.5) { const dx = p.x - SCARE.x, dy = p.y - SCARE.y, dz = p.z - SCARE.z, d2 = dx * dx + dy * dy + dz * dz; if (d2 < 9) { const k = 9 / (d2 + 0.3); acc.x += dx * k; acc.y += dy * k * 0.5; acc.z += dz * k; } }
+        f.vel.addScaledVector(acc, dt);
+        const sp = f.vel.length(), cl = clamp(sp, 0.45, t - SCARE.t < 2 ? 2.6 : 1.3);
+        f.vel.multiplyScalar(cl / (sp || 1));
+        p.addScaledVector(f.vel, dt);
+        const hs = Math.hypot(f.vel.x, f.vel.z);
+        _e.set(0, Math.atan2(-f.vel.z, f.vel.x) + Math.sin(t * 13 + f.ph) * 0.22, Math.atan2(f.vel.y, hs) * 0.8);
+        _q.setFromEuler(_e); _m4.compose(p, _q, _s); mesh.setMatrixAt(f.i, _m4);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+  };
+})();
+
+const dolphins = (() => {
+  const m = new VoxelModel(), TOP = 0x5f8fae, BELLY = 0xe4edf2;
+  for (let x = -7; x <= 7; x++) {
+    const r = x > 4 ? 1 : x > 2 ? 1.6 : x > -3 ? 2.1 : x > -5 ? 1.5 : 1;
+    for (let y = -2; y <= 2; y++) for (let z = -2; z <= 2; z++) if (y * y + z * z <= r * r + 0.3) m.set(x, y, z, y < 0 ? BELLY : vary(TOP, 0.04));
+  }
+  m.box(8, -1, 0, 9, -1, 0, 0x8aaecb); m.set(5, 1, -1, 0x111111); m.set(5, 1, 1, 0x111111);
+  m.box(-1, 3, 0, 1, 3, 0, TOP); m.box(-1, 4, 0, 0, 4, 0, TOP); m.set(-1, 5, 0, TOP);
+  for (let z = -3; z <= 3; z++) m.set(-8 - Math.round(Math.abs(z) * 0.4), 0, z, TOP);
+  m.box(1, -2, -3, 2, -2, -3, TOP); m.box(1, -2, 3, 2, -2, 3, TOP);
+  const geo = m.geometry(0.045, [-0.5, -0.5, -0.5]);
+  const D = [0, 1].map((i) => {
+    const mesh = new THREE.Mesh(geo, voxMat); mesh.castShadow = true; bottle.add(mesh);
+    return { mesh, th: i * 0.35, mode: 0, y: WL - 0.7, vy: 0, next: rr(4, 8) + i * 1.5, ph: i * 2.0 };
+  });
+  const C = { x: -3.6, z: 0, ax: 8.5, az: 5.5 }, W = 0.16;
+  return {
+    update(dt, t) {
+      for (const d of D) {
+        d.th += W * dt;
+        const x = C.x + Math.cos(d.th) * C.ax, z = C.z + Math.sin(d.th) * C.az;
+        const tx = -Math.sin(d.th) * C.ax * W, tz = Math.cos(d.th) * C.az * W;
+        const sea = ocean.heightAt(x, z);
+        if (d.mode === 0) {
+          const ty = WL - 0.75 + Math.sin(t * 0.9 + d.ph) * 0.25; d.vy += ((ty - d.y) * 6 - d.vy * 3) * dt; d.y += d.vy * dt;
+          d.next -= dt;
+          if (d.next < 0 && Math.hypot(x - ship.st.x, z - ship.st.z) > 3) { d.mode = 1; d.next = rr(5, 11); }
+        } else if (d.mode === 1) {
+          d.vy += (9 - d.vy * 2) * dt; d.y += d.vy * dt;
+          if (d.y > sea - 0.1) { d.mode = 2; d.vy = 4.3; fx.splash(x, z, 1.1); ocean.disturb(x, z, 0.12, 0.4); AUDIO.splash(0.5); }
+        } else {
+          d.vy -= 9.8 * dt; d.y += d.vy * dt;
+          if (d.y < sea && d.vy < 0) { d.mode = 0; fx.splash(x, z, 1.4); ocean.disturb(x, z, 0.18, 0.45); d.vy *= 0.3; AUDIO.splash(0.7); }
+        }
+        d.mesh.position.set(x, d.y, z);
+        d.mesh.rotation.set(Math.sin(t * 2 + d.ph) * 0.1, Math.atan2(-tz, tx), Math.atan2(d.vy, Math.hypot(tx, tz)) * 0.9, 'YZX');
+      }
+    },
+  };
+})();
+
+const turtle = (() => {
+  const body = new VoxelModel(), SH = [0x3d7a3a, 0x4f8f45, 0x2f6a30];
+  for (let x = -5; x <= 5; x++) for (let z = -4; z <= 4; z++) { const r = (x * x) / 30 + (z * z) / 18; if (r <= 1) { body.set(x, 0, z, 0xcbb779); if (r < 0.8) body.set(x, 1, z, SH[(Math.abs(x) + Math.abs(z)) % 3]); if (r < 0.35) body.set(x, 2, z, SH[(x + z + 9) % 3]); } }
+  body.box(6, 0, -1, 8, 1, 1, 0x8fae6b); body.set(8, 1, -1, 0x111111); body.set(8, 1, 1, 0x111111);
+  const geo = body.geometry(0.05, [-0.5, -0.5, -0.5]);
+  const mesh = new THREE.Mesh(geo, voxMat); mesh.castShadow = true; bottle.add(mesh);
+  const fl = new VoxelModel(); fl.box(0, 0, 0, 2, 0, 5, 0x7f9f5e); const fgeo = fl.geometry(0.05, [-1, -0.5, 0]);
+  const flips = [-1, 1].map((s) => { const f = new THREE.Mesh(fgeo, voxMat); f.position.set(0.15, 0, s * 0.18); f.scale.z = s; mesh.add(f); return f; });
+  const C = { x: 2.6, z: -3.1, r: 1.9 }; let th = 0, y = -4.2;
+  return {
+    update(dt, t) {
+      th += dt * 0.12;
+      const x = C.x + Math.cos(th) * C.r * 1.4, z = C.z + Math.sin(th) * C.r;
+      y = lerp(y, Math.min(Y_BODY - 0.4, floorAt(x, z) + 0.55), dt * 1.5);
+      mesh.position.set(x, y + Math.sin(t * 1.3) * 0.04, z);
+      mesh.rotation.set(0, Math.atan2(-Math.cos(th) * C.r, -Math.sin(th) * C.r * 1.4), Math.sin(t * 1.3) * 0.05, 'YZX');
+      flips.forEach((f, i) => { f.rotation.x = Math.sin(t * 2.2) * 0.5 * (i ? 1 : -1); });
+    },
+  };
+})();
+
+// =====================================================================
+//  GULLS + CRABS + FLOATING CARGO (rigid bodies with point buoyancy)
+// =====================================================================
+const gulls = (() => {
+  const b = new VoxelModel();
+  b.box(-3, 0, 0, 3, 1, 1, 0xf4f4f4); b.box(4, 1, 0, 4, 1, 1, 0xf4f4f4); b.set(5, 1, 0, 0xf2a33a); b.set(5, 1, 1, 0xf2a33a);
+  b.box(-5, 1, 0, -4, 1, 1, 0xd8d8d8); b.set(4, 2, 0, 0x111111);
+  const bgeo = b.geometry(0.05, [0, -0.5, -1]);
+  const w = new VoxelModel(); for (let z = 0; z < 7; z++) for (let x = -2; x <= 1 - (z > 4 ? 1 : 0); x++) w.set(x, 0, z, z > 4 ? 0x2b2b2b : x < -1 ? 0xbfc4c8 : 0xe8eaec);
+  const wgeo = w.geometry(0.05, [0, -0.5, 0]);
+  const G = [];
+  for (let i = 0; i < 6; i++) {
+    const g = new THREE.Group(), body = new THREE.Mesh(bgeo, voxMat); body.castShadow = true; g.add(body);
+    const wings = [-1, 1].map((s) => { const m = new THREE.Mesh(wgeo, voxMat); m.position.set(0, 0.06, s > 0 ? 0.1 : 0); m.scale.z = s; m.castShadow = true; g.add(m); return m; });
+    bottle.add(g);
+    G.push({ g, wings, ang: rand() * TAU, rad: rr(1.6, 3.0), hgt: rr(2.0, 3.6), om: rr(0.35, 0.6) * (rand() < 0.5 ? 1 : -1), ship: i < 3, ph: rand() * TAU });
+  }
+  return {
+    update(dt, t) {
+      for (const q of G) {
+        q.ang += q.om * dt;
+        const cx = q.ship ? ship.st.x : i2c(q).x, cz = q.ship ? ship.st.z : i2c(q).z;
+        const x = cx + Math.cos(q.ang) * q.rad, z = cz + Math.sin(q.ang) * q.rad * 0.8;
+        let y = q.hgt + Math.sin(t * 0.7 + q.ph) * 0.4;
+        const R = innerR(x) - 0.6, lim = Math.sqrt(Math.max(0.1, R * R - z * z)); y = Math.min(y, lim);
+        q.g.position.set(x, y, z);
+        const vx = -Math.sin(q.ang) * q.om, vz = Math.cos(q.ang) * q.om * 0.8;
+        q.g.rotation.set(-Math.sign(q.om) * 0.45, Math.atan2(-vz, vx), Math.cos(t * 0.7 + q.ph) * 0.12, 'YZX');
+        const glide = Math.sin(t * 0.5 + q.ph) > 0.3, flap = glide ? 0.12 : Math.sin(t * 11 + q.ph) * 0.7;
+        q.wings[0].rotation.x = flap; q.wings[1].rotation.x = -flap;
+      }
+    },
+  };
+  function i2c(q) { return q.ph > Math.PI ? { x: ISL.x, z: ISL.z } : { x: LH.x - 3.0, z: LH.z }; }
+})();
+
+const crabs = (() => {
+  const m = new VoxelModel(), RED = 0xd8432c;
+  m.box(-2, 0, -1, 2, 1, 1, RED); m.set(-1, 2, 0, 0x111111); m.set(1, 2, 0, 0x111111);
+  for (const s of [-1, 1]) { m.box(s * 3, 0, -2, s * 3, 0, 2, 0xb83a26); m.set(s * 4, -1, -2, 0xb83a26); m.set(s * 4, -1, 2, 0xb83a26); m.box(s * 2, 1, 2, s * 3, 2, 3, RED); }
+  const geo = m.geometry(0.035, [0, 0, 0]);
+  const C = [0, 1, 2, 3].map((i) => { const mesh = new THREE.Mesh(geo, voxMat); mesh.castShadow = true; bottle.add(mesh); return { mesh, th0: rr(0, TAU), ph: rand() * TAU, sp: rr(0.25, 0.5) }; });
+  return {
+    update(dt, t) {
+      for (const c of C) {
+        const th = c.th0 + Math.sin(t * c.sp + c.ph) * 0.35, x = ISL.x + Math.cos(th) * ISL.ax * 0.9, z = ISL.z + Math.sin(th) * ISL.az * 0.9;
+        c.mesh.position.set(x, surfY(x, z) + Math.abs(Math.sin(t * 9 + c.ph)) * 0.02, z);
+        c.mesh.rotation.y = -th + Math.PI / 2;
+      }
+    },
+  };
+})();
+
+// --------------------------------------------------------------------------
+//  Floating cargo: barrels, crates, a life ring, a message-in-a-bottle and
+//  the keeper's rowboat. Each is a rigid body integrated with point buoyancy.
+// --------------------------------------------------------------------------
+const FLOAT_KINDS = {
+  barrel: () => { const m = new VoxelModel(); for (let x = 0; x < 8; x++) for (let y = -3; y <= 3; y++) for (let z = -3; z <= 3; z++) { const r = 2.6 + Math.sin((x / 7) * Math.PI) * 0.6; if (y * y + z * z <= r * r) m.set(x, y, z, x === 1 || x === 6 ? 0x3a3a3a : (Math.atan2(y, z) * 3 + 9) % 2 < 1 ? 0x8a5a2e : 0x7a4f28); } return { m, s: 0.05, off: [-4, -0.5, -0.5], half: [0.2, 0.17, 0.17], mass: 1 }; },
+  crate: () => { const m = new VoxelModel(); m.box(0, 0, 0, 7, 7, 7, (x, y, z) => ([x, y, z].filter((v) => v === 0 || v === 7).length >= 2 || x === y || x === 7 - y ? 0x7a5532 : vary(0xc39257, 0.05))); return { m, s: 0.05, off: [-4, -4, -4], half: [0.2, 0.2, 0.2], mass: 1.2 }; },
+  ring: () => { const m = new VoxelModel(); for (let a = 0; a < 48; a++) { const t = (a / 48) * TAU; for (let r = 3; r <= 5; r++) for (let y = 0; y <= 1; y++) m.set(Math.round(Math.cos(t) * r), y, Math.round(Math.sin(t) * r), Math.floor(a / 6) % 2 ? 0xf4f1ea : 0xd8342c); } return { m, s: 0.05, off: [0, -1, 0], half: [0.26, 0.05, 0.26], mass: 0.5 }; },
+  bottle: () => { const m = new VoxelModel(); for (let x = 0; x < 9; x++) { const r = x < 6 ? 2 : 1; for (let y = -2; y <= 2; y++) for (let z = -2; z <= 2; z++) if (y * y + z * z <= r * r + 0.5) m.set(x, y, z, x > 7 ? 0xa6784a : x === 3 && y === 2 ? 0xf6efd8 : vary(0x2f9a63, 0.08)); } return { m, s: 0.05, off: [-4.5, -0.5, -0.5], half: [0.22, 0.1, 0.1], mass: 0.4 }; },
+  rowboat: () => { const m = new VoxelModel(); for (let x = -8; x <= 8; x++) { const w = 3.5 * Math.sqrt(Math.max(0, 1 - (x / 9) ** 2)); for (let y = -1; y <= 2; y++) for (let z = -4; z <= 4; z++) { const ww = w * (y < 0 ? 0.7 : 1); if (Math.abs(z) <= ww && (y < 0 || Math.abs(z) > ww - 1 || Math.abs(x) >= 7)) m.set(x, y, z, y === 2 ? 0xf0ece0 : y === 1 ? 0x3d6fa8 : vary(0x8a5a2e, 0.05)); } } m.box(-1, 0, -3, 0, 0, 3, 0x6b4a2b); m.line(-3, 1, -4, 5, 2, -6, 0xb08a5a); m.line(-3, 1, 4, 5, 2, 6, 0xb08a5a); return { m, s: 0.05, off: [0, -0.5, -0.5], half: [0.42, 0.1, 0.18], mass: 3 }; },
+};
+const floaters = [];
+const _geoCache = {};
+function spawnFloater(kind, x, y, z, opts = {}) {
+  if (!_geoCache[kind]) { const d = FLOAT_KINDS[kind](); _geoCache[kind] = { geo: d.m.geometry(d.s, d.off), d }; }
+  const { geo, d } = _geoCache[kind];
+  const mesh = new THREE.Mesh(geo, voxMat); mesh.castShadow = true; mesh.receiveShadow = true; bottle.add(mesh);
+  const [hx, hy, hz] = d.half, pts = [];
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) pts.push(new THREE.Vector3(sx * hx * 0.85, sy * hy * 0.85, sz * hz * 0.85));
+  pts.push(new THREE.Vector3());
+  const f = { kind, mesh, pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(), q: new THREE.Quaternion().setFromEuler(new THREE.Euler(rr(-0.4, 0.4), rand() * TAU, rr(-0.4, 0.4))),
+    w: new THREE.Vector3(rr(-1, 1), rr(-1, 1), rr(-1, 1)), pts, mass: d.mass, rad: Math.max(hx, hy, hz), hy, wasIn: false, tether: opts.tether || null, born: performance.now() };
+  floaters.push(f);
+  const loose = floaters.filter((o) => !o.tether);
+  if (loose.length > 16) { const old = loose[0]; bottle.remove(old.mesh); floaters.splice(floaters.indexOf(old), 1); }
+  return f;
+}
+const _wp = new THREE.Vector3(), _r = new THREE.Vector3(), _F = new THREE.Vector3(), _T = new THREE.Vector3(), _pv = new THREE.Vector3(), _g2 = new THREE.Vector2(), _w2 = new THREE.Vector2(), _dq = new THREE.Quaternion();
+function stepFloaters(dt) {
+  for (const f of floaters) {
+    _F.set(0, -9.8 * f.mass, 0); _T.set(0, 0, 0);
+    const kp = (9.8 * f.mass * 2.4) / (f.pts.length * f.hy * 2);
+    let sub = 0;
+    for (const p of f.pts) {
+      _r.copy(p).applyQuaternion(f.q); _wp.copy(f.pos).add(_r);
+      const hs = ocean.isWet(_wp.x, _wp.z) ? ocean.heightAt(_wp.x, _wp.z) : -99, dep = hs - _wp.y;
+      if (dep > 0) {
+        sub++;
+        _pv.copy(f.w).cross(_r).add(f.vel);
+        const fy = kp * Math.min(dep, f.hy * 2) - _pv.y * f.mass * 0.9;
+        _F.y += fy; _T.x += _r.y * 0 - _r.z * fy; _T.z += _r.x * fy; // r × (0, fy, 0)
+      }
+    }
+    const frac = sub / f.pts.length;
+    if (frac > 0) {
+      ocean.gradAt(f.pos.x, f.pos.z, _g2); windAt(f.pos.x, f.pos.z, _w2);
+      _F.x += (-_g2.x * 9.8 * 0.6 + _w2.x * 0.35) * f.mass * frac; _F.z += (-_g2.y * 9.8 * 0.6 + _w2.y * 0.35) * f.mass * frac;
+      f.vel.multiplyScalar(Math.exp(-dt * 1.4 * frac)); f.w.multiplyScalar(Math.exp(-dt * 2.6 * frac));
+      if (!f.wasIn && f.vel.y < -1.5) { const k = Math.min(3, -f.vel.y * f.mass * 0.35); fx.splash(f.pos.x, f.pos.z, k); ocean.disturb(f.pos.x, f.pos.z, 0.08 * k, 0.5); AUDIO.splash(Math.min(1, k * 0.4)); SCARE.x = f.pos.x; SCARE.y = WL - 1; SCARE.z = f.pos.z; SCARE.t = U.uTime.value; }
+    }
+    f.wasIn = frac > 0;
+    if (f.tether) { const d = _r.copy(f.tether).sub(f.pos); d.y = 0; const l = d.length(); if (l > 0.5) _F.addScaledVector(d, (l - 0.5) * 8 * f.mass / l); }
+    f.vel.addScaledVector(_F, dt / f.mass);
+    f.w.addScaledVector(_T, dt / (f.mass * f.rad * f.rad * 0.6));
+    f.pos.addScaledVector(f.vel, dt);
+    _dq.set(f.w.x * dt * 0.5, f.w.y * dt * 0.5, f.w.z * dt * 0.5, 0).multiply(f.q);
+    f.q.set(f.q.x + _dq.x, f.q.y + _dq.y, f.q.z + _dq.z, f.q.w + _dq.w).normalize();
+    // collisions: land, glass, the ship's hull, each other
+    const th = terrainH(f.pos.x, f.pos.z);
+    if (f.pos.y - f.hy < th) {
+      if (th > WL - 0.2 && f.pos.y - f.hy < th - 0.1) {          // drifted sideways into a shore: bounce off it, don't climb it
+        const gx = terrainH(f.pos.x + 0.2, f.pos.z) - terrainH(f.pos.x - 0.2, f.pos.z), gz = terrainH(f.pos.x, f.pos.z + 0.2) - terrainH(f.pos.x, f.pos.z - 0.2), l = Math.hypot(gx, gz) || 1;
+        f.pos.x -= (gx / l) * 0.04; f.pos.z -= (gz / l) * 0.04;
+        const vn = (f.vel.x * gx + f.vel.z * gz) / l; if (vn > 0) { f.vel.x -= (1.5 * vn * gx) / l; f.vel.z -= (1.5 * vn * gz) / l; }
+      } else { f.pos.y = th + f.hy; if (f.vel.y < 0) f.vel.y *= -0.2; f.vel.x *= 0.9; f.vel.z *= 0.9; f.w.multiplyScalar(0.9); }
+    }
+    const rad = Math.hypot(f.pos.y, f.pos.z), R = innerR(f.pos.x) - f.rad - 0.05;
+    if (rad > R) { const ny = f.pos.y / rad, nz = f.pos.z / rad, vn = f.vel.y * ny + f.vel.z * nz; f.pos.y = ny * R; f.pos.z = nz * R; if (vn > 0) { f.vel.y -= 1.4 * vn * ny; f.vel.z -= 1.4 * vn * nz; } }
+    if (f.pos.x < X_BASE + 0.5 + f.rad) { f.pos.x = X_BASE + 0.5 + f.rad; f.vel.x = Math.abs(f.vel.x) * 0.4; }
+    if (f.pos.x > 10.6) { f.pos.x = 10.6; f.vel.x = -Math.abs(f.vel.x) * 0.4; }
+    const sx = ship.st.x, sz = ship.st.z, fx0 = ship.fwd.x, fz0 = ship.fwd.y;
+    const along = clamp((f.pos.x - sx) * fx0 + (f.pos.z - sz) * fz0, -2.3, 2.3), cxp = sx + fx0 * along, czp = sz + fz0 * along;
+    const dx = f.pos.x - cxp, dz = f.pos.z - czp, dd = Math.hypot(dx, dz), half = 0.72 * Math.sqrt(1 - (along / 2.6) ** 2) + f.rad;
+    if (dd < half && f.pos.y < ship.st.y + 0.6) { const nx = dx / (dd || 1), nz = dz / (dd || 1); f.pos.x = cxp + nx * half; f.pos.z = czp + nz * half; f.vel.x = ship.st.vel.x + nx * 0.6; f.vel.z = ship.st.vel.y + nz * 0.6; f.w.y += rr(-1, 1); }
+  }
+  for (let i = 0; i < floaters.length; i++) for (let j = i + 1; j < floaters.length; j++) {
+    const a = floaters[i], b = floaters[j], d = _r.copy(b.pos).sub(a.pos), l = d.length(), m = a.rad + b.rad;
+    if (l < m && l > 1e-4) { d.multiplyScalar((m - l) / l * 0.5); a.pos.sub(d); b.pos.add(d); const tv = a.vel.clone(); a.vel.lerp(b.vel, 0.5); b.vel.lerp(tv, 0.5); }
+  }
+  for (const f of floaters) { f.mesh.position.copy(f.pos); f.mesh.quaternion.copy(f.q); }
+}
+spawnFloater('barrel', -7.5, WL + 0.3, 5.6); spawnFloater('barrel', 3.4, WL + 0.3, -5.6); spawnFloater('crate', -12.6, WL + 0.3, -1.0);
+spawnFloater('ring', 1.8, WL + 0.3, 5.7); spawnFloater('bottle', -1.0, WL + 0.3, -5.8);
+spawnFloater('rowboat', PROPS.pier.x, WL + 0.2, PROPS.pier.z, { tether: PROPS.pier.clone() });
+
+// =====================================================================
+//  LIGHT & SKY — the bottle has its own tiny sun and moon on an arc,
+//  stars on the inside of the glass, voxel clouds, a lighthouse beam
+// =====================================================================
+document.getElementById('loadmsg').textContent = 'hanging the sun and moon';
+const hemi = new THREE.HemisphereLight(0xbfdcff, 0x5a4630, 0.9); scene.add(hemi);
+const sunLight = new THREE.DirectionalLight(0xfff1d6, 2.6);
+sunLight.castShadow = true; sunLight.shadow.mapSize.set(2048, 2048);
+Object.assign(sunLight.shadow.camera, { left: -23, right: 23, top: 11, bottom: -11, near: 1, far: 100 });
+sunLight.shadow.camera.up.set(0, 0, 1);
+sunLight.shadow.bias = -0.0004; sunLight.shadow.normalBias = 0.035;
+scene.add(sunLight, sunLight.target);
+const fillLight = new THREE.DirectionalLight(0xffd6a8, 0.45); fillLight.position.set(-30, 25, 40); scene.add(fillLight);
+
+// background: a warm, blurred "study" with bokeh lamps; colours follow the time of day
+const BG = { top: new THREE.Color(), mid: new THREE.Color(), bot: new THREE.Color() };
+const bokeh = [], bokehCol = [];
+for (let i = 0; i < 14; i++) { const a = rr(-2.6, 0.2) + (i % 2 ? Math.PI : 0), e = rr(-0.08, 0.35); bokeh.push(new THREE.Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e))); bokehCol.push(new THREE.Color().setHSL(rr(0.05, 0.13), 0.8, 0.6)); }
+const bgMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false,
+  uniforms: { uTop: { value: BG.top }, uMid: { value: BG.mid }, uBot: { value: BG.bot }, uB: { value: bokeh }, uBC: { value: bokehCol }, uNight: { value: 0 } },
+  vertexShader: `varying vec3 vD; void main(){ vD = position; vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position = p.xyww; }`,
+  fragmentShader: `uniform vec3 uTop, uMid, uBot, uB[14], uBC[14]; uniform float uNight; varying vec3 vD;
+    void main(){ vec3 d = normalize(vD); float y = d.y;
+      vec3 c = y > 0.0 ? mix(uMid, uTop, smoothstep(0.0, 0.65, y)) : mix(uMid, uBot, smoothstep(0.0, 0.35, -y));
+      for (int i = 0; i < 14; i++) { float k = dot(d, normalize(uB[i])); float r = 0.99935 - float(i % 4) * 0.00022;
+        c += uBC[i] * smoothstep(r, r + 0.00018, k) * (0.035 + 0.3 * uNight) * (0.7 + 0.3 * smoothstep(r + 0.0001, r + 0.0005, k)); }
+      gl_FragColor = vec4(c, 1.0); }`,
+});
+const bgSphere = new THREE.Mesh(new THREE.SphereGeometry(300, 48, 24), bgMat); bgSphere.renderOrder = -10; scene.add(bgSphere);
+scene.fog = new THREE.Fog(0x2a2420, 70, 190);
+
+// sun + moon voxels
+const SUNX = -2.5, SUN_R = 5.3;
+function orb(r, colFn) { const m = new VoxelModel(); m.ball(0, 0, 0, r, colFn); return m.geometry(0.1, [-0.5, -0.5, -0.5]); }
+const sunMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(5, 3.6, 1.6), fog: false });
+const moonMat = new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(1.25, 1.3, 1.6), fog: false });
+const sunOrb = new THREE.Mesh(orb(3.6, (x, y, z) => (hash3(x, y, z) < 0.3 ? 0xffd28a : 0xffffff)), sunMat);
+const moonOrb = new THREE.Mesh(orb(2.8, (x, y, z) => (hash3(x + 5, y, z) < 0.22 ? 0x9a9aa8 : 0xf4f4ff)), moonMat);
+bottle.add(sunOrb, moonOrb);
+
+// stars painted on the inside of the glass
+const starGeo = new THREE.BufferGeometry(), sp = [];
+for (let i = 0; i < 420; i++) { const x = rr(-15, 13), a = rr(-1.25, 1.25), r = innerR(x) - 0.15; if (r < 2.5) continue; sp.push(x, Math.cos(a) * r, Math.sin(a) * r); }
+starGeo.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+const starMat = new THREE.PointsMaterial({ color: new THREE.Color(2.2, 2.2, 2.6), size: 0.07, transparent: true, opacity: 0, depthWrite: false, fog: false });
+const stars = new THREE.Points(starGeo, starMat); stars.renderOrder = 2; bottle.add(stars);
+
+// clouds circulate with the bottle's air gyre
+const cloudMat = insideMaterial({ roughness: 1 });
+const clouds = [];
+for (let i = 0; i < 6; i++) {
+  const m = new VoxelModel(), n = ri(4, 7);
+  for (let k = 0; k < n; k++) { const cx = Math.round((k - n / 2) * rr(1.6, 2.4)), cy = ri(0, 2), cz = ri(-2, 2); m.ball(cx, cy, cz, rr(1.8, 3.2), (x, y) => (y <= 0 ? 0xd9dde6 : hash3(x, y, k) < 0.15 ? 0xf0f2f7 : 0xffffff)); }
+  for (const [kk] of [...m.map]) { const y = (Math.floor(kk / KX) % KX) - 512; if (y < -1) m.map.delete(kk); }
+  const mesh = voxMesh(m, 0.2, cloudMat); mesh.castShadow = true; mesh.receiveShadow = false;
+  bottle.add(mesh);
+  clouds.push({ mesh, th: (i / 6) * TAU + rr(-0.3, 0.3), y: rr(3.2, 4.6), ax: rr(7, 11), az: rr(1.2, 2.6), sp: rr(0.025, 0.045), rainAcc: 0 });
+}
+function updateClouds(dt, storm) {
+  for (const c of clouds) {
+    c.th -= c.sp * dt * (1 + storm * 1.5);
+    const x = -2.5 + Math.cos(c.th) * c.ax, z = Math.sin(c.th) * c.az;
+    const y = Math.min(c.y - storm * 0.5, Math.sqrt(Math.max(1, (innerR(x) - 1.3) ** 2 - z * z)) - 0.6);
+    c.mesh.position.set(x, y, z);
+    c.mesh.scale.setScalar(Math.min(1, (innerR(x) - 1.5) / 5.5));
+    if (storm > 0.25) {
+      c.rainAcc += dt * storm * 70;
+      while (c.rainAcc > 1) { c.rainAcc--; fx.rain(x + rr(-1.6, 1.6), y - 0.3, z + rr(-0.6, 0.6)); }
+    }
+  }
+}
+
+// lighthouse beams (additive cones, clipped to the bottle in the shader)
+const beamMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  uniforms: { uI: { value: 0 }, uBInv: U.uBInv },
+  vertexShader: `uniform mat4 uBInv; varying float vT; varying vec3 vBL; varying vec3 vN; varying vec3 vV;
+    void main(){ vT = length(position) / 11.0; vec4 wp = modelMatrix * vec4(position, 1.0); vBL = (uBInv * wp).xyz;
+      vN = normalize(mat3(modelMatrix) * normal); vV = normalize(cameraPosition - wp.xyz); gl_Position = projectionMatrix * viewMatrix * wp; }`,
+  fragmentShader: `uniform float uI; varying float vT; varying vec3 vBL; varying vec3 vN; varying vec3 vV;
+    float innerR(float x){ if (x <= 11.0) return 7.0; if (x >= 15.0) return 2.1; return 2.1 + 4.9 * (0.5 + 0.5 * cos(3.14159 * (x - 11.0) / 4.0)); }
+    void main(){ if (length(vBL.yz) > innerR(vBL.x) - 0.08 || vBL.x < -15.5) discard;
+      float edge = pow(abs(dot(normalize(vN), vV)), 1.6);
+      gl_FragColor = vec4(vec3(1.0, 0.93, 0.7) * uI * pow(max(1.0 - vT, 0.0), 1.4) * edge * 0.55, 1.0); }`,
+});
+const beam = new THREE.Group();
+for (const s of [0, Math.PI]) { const g = new THREE.ConeGeometry(1.5, 11, 24, 1, true); g.translate(0, -5.5, 0); g.rotateZ(Math.PI / 2); const m = new THREE.Mesh(g, beamMat); m.rotation.y = s; m.rotation.z = -0.06; m.renderOrder = 7; beam.add(m); }
+beam.position.copy(PROPS.lamp); bottle.add(beam);
+const lampLight = new THREE.PointLight(0xffe2a0, 0, 16, 1.4); lampLight.position.copy(PROPS.lamp); bottle.add(lampLight);
+const fireLight = new THREE.PointLight(0xff8a3a, 0, 5, 1.6); fireLight.position.copy(PROPS.fire).add(new THREE.Vector3(0, 0.3, 0)); bottle.add(fireLight);
+const lavaLight = new THREE.PointLight(0xff5a1a, 1.5, 6, 1.5); lavaLight.position.copy(PROPS.vent).add(new THREE.Vector3(0, 0.6, 0)); bottle.add(lavaLight);
+
+const _sd = new THREE.Vector3(), _bq = new THREE.Quaternion();
+function updateSky(tod, storm, t) {
+  const a = (tod - 0.25) * TAU, e = Math.sin(a);
+  const day = sstep(-0.12, 0.22, e), night = 1 - day;
+  sunOrb.position.set(SUNX - Math.cos(a) * 8, WL + e * SUN_R, -2.2); sunOrb.visible = e > -0.05;
+  moonOrb.position.set(SUNX + Math.cos(a) * 8, WL - e * SUN_R, -1.6); moonOrb.visible = e < 0.05;
+  sunOrb.rotation.y = t * 0.2; moonOrb.rotation.y = -t * 0.1;
+  sunMat.color.setRGB(3.2, lerp(1.4, 2.5, sstep(0, 0.5, e)), lerp(0.45, 1.2, sstep(0, 0.5, e))).multiplyScalar(1 - storm * 0.5);
+  // directional light follows whichever body is up
+  const useSun = e > -0.06;
+  const src = useSun ? sunOrb.position : moonOrb.position;
+  _sd.set(src.x - SUNX, src.y - WL, src.z * 0.5).normalize();
+  bottle.getWorldQuaternion(_bq); _sd.applyQuaternion(_bq);
+  sunLight.position.copy(_sd).multiplyScalar(45); sunLight.target.position.set(0, 0, 0);
+  const elev = useSun ? e : -e;
+  if (useSun) sunLight.color.setRGB(1, lerp(0.62, 0.95, sstep(0, 0.5, elev)), lerp(0.35, 0.86, sstep(0, 0.5, elev)));
+  else sunLight.color.setRGB(0.62, 0.72, 1.0);
+  sunLight.intensity = (useSun ? 2.9 * sstep(-0.06, 0.2, elev) : 0.75 * sstep(0, 0.3, elev)) * (1 - storm * 0.55);
+  hemi.intensity = (0.32 + 0.78 * day) * (1 - storm * 0.35);
+  hemi.color.setRGB(lerp(0.22, 0.75, day), lerp(0.28, 0.86, day), lerp(0.5, 1.0, day));
+  // background + water reflection colours
+  BG.top.setRGB(lerp(0.012, 0.2, day), lerp(0.016, 0.29, day), lerp(0.045, 0.44, day)).lerp(new THREE.Color(0.08, 0.09, 0.11), storm * 0.6);
+  BG.mid.setRGB(lerp(0.05, 0.42, day), lerp(0.04, 0.34, day), lerp(0.06, 0.27, day)).lerp(new THREE.Color(0.12, 0.12, 0.13), storm * 0.5);
+  BG.bot.setRGB(lerp(0.01, 0.08, day), lerp(0.008, 0.055, day), lerp(0.006, 0.035, day));
+  bgMat.uniforms.uNight.value = night;
+  scene.fog.color.copy(BG.mid).multiplyScalar(0.6);
+  U.uSky.value.setRGB(lerp(0.05, 0.62, day), lerp(0.08, 0.78, day), lerp(0.2, 0.95, day)).multiplyScalar(1 - storm * 0.5);
+  starMat.opacity = sstep(0.55, 0.95, night) * (1 - storm) * (0.85 + 0.15 * Math.sin(t * 3));
+  cloudMat.color.setRGB(lerp(0.5, 1, day), lerp(0.56, 1, day), lerp(0.78, 1, day)).multiplyScalar(lerp(1, 0.4, storm));
+  hemi.groundColor.setRGB(lerp(0.06, 0.35, day), lerp(0.07, 0.27, day), lerp(0.12, 0.19, day));
+  // night lights
+  glowMat.color.setScalar(1 + night * 2.6);
+  beamMat.uniforms.uI.value = sstep(0.4, 0.8, night) + storm * 0.6;
+  beam.rotation.y = t * 0.8;
+  lampLight.intensity = (sstep(0.4, 0.8, night) + storm * 0.5) * 9;
+  ship.lantern.intensity = night * 4 * (0.9 + 0.1 * Math.sin(t * 13));
+  fireLight.intensity = (0.4 + night * 3) * (0.8 + 0.2 * Math.sin(t * 17) * Math.sin(t * 7.3));
+  lavaLight.intensity = (1.2 + night * 2.5) * (0.85 + 0.15 * Math.sin(t * 5.1));
+  return { day, night };
+}
+
+// =====================================================================
+//  THE BOTTLE — lathed glass shell with fresnel reflections & glints,
+//  a voxel cork with wax seal and twine, walnut cradle, table, candle
+// =====================================================================
+document.getElementById('loadmsg').textContent = 'blowing the glass';
+const glassPts = [];
+{
+  const add = (r, h) => glassPts.push(new THREE.Vector2(r, h));
+  [[0.01, -15.56], [1.6, -15.62], [3.6, -15.84], [5.6, -15.97], [6.75, -15.92], [7.14, -15.7], [7.28, -15.3]].forEach(([r, h]) => add(r, h));
+  for (let i = 0; i <= 24; i++) { const h = lerp(-15.0, 10.8, i / 24); add(R_OUT, h); }
+  for (let i = 1; i <= 20; i++) { const t = i / 20, h = 11 + 4 * t; add(2.38 + (R_OUT - 2.38) * (0.5 + 0.5 * Math.cos(Math.PI * t)), h); }
+  [[2.38, 18.55], [2.62, 18.72], [2.73, 19.05], [2.72, 19.5], [2.55, 19.74], [2.14, 19.76], [2.1, 19.5]].forEach(([r, h]) => add(r, h));
+  for (let i = 0; i <= 20; i++) { const t = 1 - i / 20, h = 11 + 4 * t; add(R_NECK + (R_IN - R_NECK) * (0.5 + 0.5 * Math.cos(Math.PI * t)), h); }
+  for (let i = 1; i <= 24; i++) add(R_IN, lerp(10.8, -15.2, i / 24));
+  [[6.62, -15.58], [4.2, -15.56], [2.2, -15.44], [0.01, -15.3]].forEach(([r, h]) => add(r, h));
+}
+const glassGeo = new THREE.LatheGeometry(glassPts, 128);
+glassGeo.rotateZ(-Math.PI / 2);
+const glassMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, side: THREE.FrontSide,
+  blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+  uniforms: { uSun: { value: new THREE.Vector3(0, 1, 0) }, uSunCol: { value: new THREE.Color(1, 1, 1) }, uTop: { value: BG.top }, uMid: { value: BG.mid }, uBot: { value: BG.bot }, uDay: U.uDay, uFlash: U.uFlash, uNight: { value: 0 } },
+  vertexShader: `varying vec3 vN; varying vec3 vW; varying vec3 vL;
+    void main(){ vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz; vL = position; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * viewMatrix * wp; }`,
+  fragmentShader: `uniform vec3 uSun, uSunCol, uTop, uMid, uBot; uniform float uDay, uFlash, uNight; varying vec3 vN; varying vec3 vW; varying vec3 vL;
+    vec3 env(vec3 r){
+      vec3 c = r.y > 0.0 ? mix(uMid, uTop, smoothstep(0.0, 0.7, r.y)) : mix(uMid, uBot, smoothstep(0.0, 0.5, -r.y));
+      float box1 = smoothstep(0.8, 0.93, r.y) * smoothstep(0.75, 0.35, abs(r.x));
+      float box2 = smoothstep(0.86, 0.97, dot(r, normalize(vec3(-0.45, 0.35, 0.82))));
+      float box3 = smoothstep(0.9, 0.985, dot(r, normalize(vec3(0.7, 0.15, 0.7))));
+      c += vec3(1.0, 0.96, 0.9) * (box1 * 1.7 + box2 * 1.2) * (0.25 + 0.75 * uDay) + vec3(1.0, 0.7, 0.4) * box3 * (0.3 + uNight * 1.3);
+      return c;
+    }
+    void main(){
+      vec3 n = normalize(vN), v = normalize(cameraPosition - vW);
+      if (dot(n, v) < 0.0) n = -n;
+      float ndv = clamp(dot(n, v), 0.0, 1.0), fr = 0.035 + 0.965 * pow(1.0 - ndv, 4.5);
+      vec3 r = reflect(-v, n);
+      vec3 col = env(r) * fr;
+      float sd = max(dot(r, uSun), 0.0), sp = pow(sd, 1200.0) * 40.0 + pow(sd, 80.0) * 0.5;
+      col += uSunCol * sp;
+      float thick = smoothstep(17.5, 19.8, vL.x) + smoothstep(-15.0, -15.9, vL.x) * 0.6;
+      col += vec3(0.25, 0.55, 0.42) * (0.025 + thick * 0.06) + vec3(0.7, 0.8, 1.0) * uFlash * fr * 3.0;
+      float a = clamp(0.045 + fr * 0.8 + sp * 0.4 + thick * 0.18, 0.0, 1.0);
+      gl_FragColor = vec4(col, a);
+    }`,
+});
+const glass = new THREE.Mesh(glassGeo, glassMat); glass.renderOrder = 10; bottle.add(glass);
+
+// cork, wax seal, twine and a paper tag
+(function cork() {
+  const m = new VoxelModel();
+  for (let x = 182; x <= 212; x++) {
+    const r = x < 198 ? 20.5 : 22.5 + Math.min(1, (x - 198) / 4);
+    for (let y = -24; y <= 24; y++) for (let z = -24; z <= 24; z++) {
+      const d = Math.hypot(y + 0.5, z + 0.5); if (d > r || (d < r - 1.5 && x > 183 && x < 211)) continue;
+      let c = hash3(x, y, z) < 0.2 ? 0xa57a48 : hash3(y, z, x) < 0.15 ? 0xe2b880 : 0xc99c64;
+      if (x >= 209 || (x >= 200 && d > r - 1.2 && hash3(y, z, 7) < 0.55 - (209 - x) * 0.07)) c = vary(0xa8202a, 0.06);
+      m.set(x, y, z, c);
+    }
+  }
+  for (let x = 213; x <= 214; x++) for (let y = -8; y <= 8; y++) for (let z = -8; z <= 8; z++) if (y * y + z * z <= 64) m.set(x, y, z, (Math.abs(y) + Math.abs(z)) % 5 === 0 ? 0x7d1218 : 0xb22630);
+  for (let x = 176; x <= 179; x++) for (let a = 0; a < 80; a++) { const t = (a / 80) * TAU; m.set(x, Math.round(Math.sin(t) * 24.6), Math.round(Math.cos(t) * 24.6), (x + a) % 3 ? 0x8a6a3a : 0x6d5230); }
+  m.line(178, -24, 2, 176, -38, 7, 0x8a6a3a);
+  m.box(170, -48, 7, 182, -38, 7, (x, y) => (y === -42 || y === -44) && x > 172 && x < 180 ? 0x6b5640 : 0xf2e6c4);
+  const mesh = voxMesh(m, 0.1, voxMatOut); mesh.castShadow = true; bottle.add(mesh);
+})();
+
+// walnut cradle + base + brass plaque (outside the bottle group: it stays put when the bottle rocks)
+const TABLE_Y = -9.6;
+(function stand() {
+  const m = new VoxelModel(), S = 0.25;
+  for (const cx of [-9, 6]) for (let i = Math.round(cx / S) - 3; i <= Math.round(cx / S) + 3; i++)
+    for (let j = Math.round((TABLE_Y + 0.6) / S); j <= Math.round(-4.6 / S); j++) for (let k = -26; k < 26; k++) {
+      const y = (j + 0.5) * S, z = (k + 0.5) * S;
+      if (Math.hypot(y, z) < R_OUT + 0.06 || Math.abs(z) > 6.4 - Math.max(0, y + 6.8) * 0.9) continue;
+      m.set(i, j, k, (j + (k >> 2)) % 5 === 0 ? 0x4a2e1a : vary(0x6b4226, 0.05));
+    }
+  for (let i = Math.round(-14.5 / S); i <= Math.round(11.5 / S); i++) for (let j = Math.round(TABLE_Y / S); j < Math.round((TABLE_Y + 0.6) / S); j++) for (let k = -15; k < 15; k++)
+    m.set(i, j, k, j === Math.round((TABLE_Y + 0.6) / S) - 1 && (Math.abs(k) === 14 || i === Math.round(-14.5 / S) || i === Math.round(11.5 / S)) ? 0xc79a3a : vary(0x5a3820, 0.05));
+  const mesh = voxMesh(m, S, voxMatOut); scene.add(mesh);
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = 160; const g = cv.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 0, 160); gr.addColorStop(0, '#f3d27a'); gr.addColorStop(0.5, '#c8952f'); gr.addColorStop(1, '#8a6118');
+  g.fillStyle = gr; g.fillRect(0, 0, 1024, 160); g.strokeStyle = '#6b4a12'; g.lineWidth = 8; g.strokeRect(10, 10, 1004, 140);
+  g.fillStyle = '#4a320c'; g.font = 'bold 58px Georgia, serif'; g.textAlign = 'center'; g.fillText('THE VOXEL VOYAGER', 512, 82);
+  g.font = 'italic 30px Georgia, serif'; g.fillText('launched in a bottle · anno MDCCXXVI', 512, 128);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const plaque = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.0), new THREE.MeshStandardMaterial({ map: tex, metalness: 0.6, roughness: 0.35 }));
+  plaque.position.set(-1.5, TABLE_Y + 0.3, 3.76); scene.add(plaque);
+})();
+
+// table of chunky planks, a candle and a brass compass
+const candleLight = new THREE.PointLight(0xffa04a, 0, 30, 1.3);
+(function table() {
+  const COLS = [0x6e4a2c, 0x7a5232, 0x664428, 0x825a37, 0x5f3f25];
+  for (let i = -12; i < 12; i++) {
+    const w = 1.96, mat = new THREE.MeshStandardMaterial({ color: COLS[(i + 12) % 5], roughness: 0.8 });
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(90, 0.6, w), mat);
+    plank.position.set(((i * 7) % 5) * 0.4, TABLE_Y - 0.3 - ((i * 3) % 2) * 0.04, i * 2 + 1); plank.receiveShadow = true; scene.add(plank);
+  }
+  const c = new VoxelModel(), S = 0.1;
+  for (let y = 0; y < 3; y++) for (let x = -9; x <= 9; x++) for (let z = -9; z <= 9; z++) if (x * x + z * z <= (y === 2 ? 30 : 80)) c.set(x, y, z, y === 1 ? 0xb8862c : 0xd9a441);
+  for (let y = 3; y < 26; y++) for (let x = -5; x <= 5; x++) for (let z = -5; z <= 5; z++) { const r = x * x + z * z; if (r <= 25 - (y > 23 ? (y - 23) * 6 : 0)) c.set(x, y, z, y > 20 && r > 16 && hash3(x, y, z) < 0.5 ? 0xfff6e6 : vary(0xf1e6cc, 0.03)); }
+  c.box(0, 26, 0, 0, 27, 0, 0x222222);
+  const cm = voxMesh(c, S, voxMatOut); cm.position.set(-19, TABLE_Y, 8.5); scene.add(cm);
+  const fl = new VoxelModel(); fl.box(-1, 0, -1, 1, 2, 1, 0xffb347); fl.box(0, 3, 0, 0, 5, 0, 0xffe08a); fl.set(0, 1, 0, 0xfff6c8);
+  const flame = new THREE.Mesh(fl.geometry(0.1, [-0.5, 0, -0.5]), new THREE.MeshBasicMaterial({ vertexColors: true, color: new THREE.Color(4, 3, 2) }));
+  flame.position.set(-19, TABLE_Y + 2.8, 8.5); scene.add(flame);
+  candleLight.position.set(-19, TABLE_Y + 3.6, 8.5); scene.add(candleLight);
+  candleLight.userData.flame = flame;
+  const k = new VoxelModel();
+  for (let x = -12; x <= 12; x++) for (let z = -12; z <= 12; z++) { const r = Math.hypot(x, z); if (r <= 12) { k.set(x, 0, z, r > 10.5 ? 0xc99a3a : 0xe8dcc0); if (r > 10.5) k.set(x, 1, z, 0xb3842c); } }
+  for (let i = 1; i <= 8; i++) { k.set(i, 1, -Math.round(i * 0.3), 0xc8342c); k.set(-i, 1, Math.round(i * 0.3), 0x2a2a2a); }
+  for (const [x, z] of [[0, -9], [0, 9], [9, 0], [-9, 0]]) k.set(x, 1, z, 0x3a3a3a);
+  const km = voxMesh(k, 0.1, voxMatOut); km.position.set(14.5, TABLE_Y, 9); km.rotation.y = 0.4; scene.add(km);
+  for (const [x, z, col] of [[-12, 11, 0xf4c7b8], [17.5, 5.5, 0xf6e7d2], [-24, 3, 0xe9b8a8]]) {
+    const s = new VoxelModel(); for (let a = 0; a < 7; a++) for (let r = 0; r <= 4 - Math.abs(a - 3) * 0.5; r++) s.set(Math.round(Math.cos(a * 0.45 - 1.35) * r), r > 2 ? 1 : 0, Math.round(Math.sin(a * 0.45 - 1.35) * r), a % 2 ? col : shade(col, 0.85));
+    const sm = voxMesh(s, 0.12, voxMatOut); sm.position.set(x, TABLE_Y, z); sm.rotation.y = rand() * TAU; scene.add(sm);
+  }
+})();
+
+// =====================================================================
+//  AUDIO (synthesised, off until the user enables it)
+// =====================================================================
+const AUDIO = (() => {
+  let ctx = null, master, sea, wind, noise, on = false;
+  function init() {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain(); master.gain.value = 0; master.connect(ctx.destination);
+    noise = ctx.createBuffer(1, ctx.sampleRate * 4, ctx.sampleRate);
+    const d = noise.getChannelData(0); let last = 0;
+    for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; last = (last + 0.03 * w) / 1.03; d[i] = last * 3 + w * 0.08; }
+    const loop = (freq, type) => { const s = ctx.createBufferSource(); s.buffer = noise; s.loop = true; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; const g = ctx.createGain(); g.gain.value = 0; s.connect(f).connect(g).connect(master); s.start(); return g; };
+    sea = loop(420, 'lowpass'); wind = loop(900, 'bandpass');
+  }
+  function burst(dur, freq, type, vol, delay = 0) {
+    if (!on) return;
+    const s = ctx.createBufferSource(); s.buffer = noise; const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq;
+    const g = ctx.createGain(), t0 = ctx.currentTime + delay; g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    s.connect(f).connect(g).connect(master); s.start(t0, Math.random() * 3); s.stop(t0 + dur + 0.1);
+  }
+  return {
+    get on() { return on; },
+    toggle() { if (!ctx) init(); on = !on; ctx.resume(); master.gain.setTargetAtTime(on ? 0.6 : 0, ctx.currentTime, 0.4); return on; },
+    update(t, storm) { if (!on) return; sea.gain.setTargetAtTime(0.18 + 0.14 * Math.sin(t * 0.55) ** 2 + storm * 0.25, ctx.currentTime, 0.3); wind.gain.setTargetAtTime(0.015 + storm * 0.12, ctx.currentTime, 0.5); },
+    thunder() { burst(3.2, 140, 'lowpass', 1.2, 0.25); burst(1.2, 400, 'lowpass', 0.5, 0.2); },
+    splash(k = 0.5) { burst(0.35 + k * 0.3, 1400, 'bandpass', 0.25 * k); },
+  };
+})();
+
+// =====================================================================
+//  STATE, UI, INPUT
+// =====================================================================
+const state = { storm: 0, stormT: 0, tod: 0.36, cycle: true, rock: false, follow: false, orbit: false, idle: 0 };
+const tilt = { rx: 0, vx: 0, rz: 0, vz: 0, tx: 0, tz: 0, drag: false, shake: 0 };
+const $ = (id) => document.getElementById(id);
+const setOn = (id, v) => $(id).classList.toggle('on', !!v);
+function toggleStorm() { state.storm = state.storm ? 0 : 1; setOn('bStorm', state.storm); }
+function shake() {
+  tilt.vx += rr(-1.6, 1.6) || 1; tilt.vz += rr(-0.35, 0.35); tilt.shake = 0.6;
+  ocean.kick(rr(-0.12, 0.12), rr(-0.2, 0.2));
+  for (let i = 0; i < 18; i++) { const x = rr(-14, 9), z = rr(-5, 5); if (ocean.isWet(x, z)) { ocean.disturb(x, z, rr(0.15, 0.35), 0.6); if (i % 3 === 0) fx.splash(x, z, 1.2); } }
+  ship.kick(rr(-0.8, 0.8), rr(-0.4, 0.4), rr(0.5, 1.2));
+  for (const f of floaters) { f.vel.add(new THREE.Vector3(rr(-1.5, 1.5), rr(1, 3), rr(-1.5, 1.5))); f.w.add(new THREE.Vector3(rr(-4, 4), rr(-4, 4), rr(-4, 4))); }
+  SCARE.x = -4; SCARE.y = -3.5; SCARE.z = 0; SCARE.t = U.uTime.value;
+  for (let i = 0; i < 14; i++) fx.ember(PROPS.vent.x, PROPS.vent.y + 0.2, PROPS.vent.z, rr(-1.2, 1.2), rr(3, 5), rr(-1.2, 1.2));
+  AUDIO.splash(1);
+}
+function setFollow(v) { state.follow = v; setOn('bFollow', v); }
+$('bStorm').onclick = toggleStorm;
+$('bShake').onclick = shake;
+$('bRock').onclick = () => { state.rock = !state.rock; setOn('bRock', state.rock); };
+$('bCycle').onclick = () => { state.cycle = !state.cycle; setOn('bCycle', state.cycle); };
+$('bFollow').onclick = () => setFollow(!state.follow);
+$('bOrbit').onclick = () => { state.orbit = !state.orbit; controls.autoRotate = state.orbit; setOn('bOrbit', state.orbit); };
+$('bSound').onclick = () => { const v = AUDIO.toggle(); $('bSound').textContent = v ? 'Sound on' : 'Sound off'; setOn('bSound', v); };
+$('tod').oninput = (e) => { state.tod = +e.target.value; state.cycle = false; setOn('bCycle', false); };
+controls.autoRotateSpeed = 0.5;
+addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  if (k === 's') toggleStorm(); else if (k === 'k') shake(); else if (k === 'f') setFollow(!state.follow);
+  else if (k === 'n') { state.tod = state.tod > 0.25 && state.tod < 0.75 ? 0.92 : 0.4; state.cycle = false; setOn('bCycle', false); }
+  else if (k === 'r') $('bRock').onclick(); else if (k === 'o') $('bOrbit').onclick();
+});
+const cvs = renderer.domElement;
+cvs.addEventListener('contextmenu', (e) => e.preventDefault());
+let down = null;
+cvs.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, b: e.button, t: performance.now() }; if (e.button === 2) { tilt.drag = true; cvs.setPointerCapture(e.pointerId); } state.idle = 0; });
+cvs.addEventListener('pointermove', (e) => {
+  if (!tilt.drag || !down) return;
+  tilt.tx = clamp(tilt.tx + e.movementX * 0.003, -0.16, 0.16); tilt.tz = clamp(tilt.tz - e.movementY * 0.001, -0.06, 0.06);
+});
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+cvs.addEventListener('pointerup', (e) => {
+  if (e.button === 2) { tilt.drag = false; tilt.tx = 0; tilt.tz = 0; }
+  if (down && e.button === 0 && Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6 && performance.now() - down.t < 400) dropCargo(e);
+  down = null;
+});
+function dropCargo(e) {
+  ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const inv = bottle.matrixWorld.clone().invert(), o = ray.ray.origin.clone().applyMatrix4(inv), d = ray.ray.direction.clone().transformDirection(inv);
+  if (Math.abs(d.y) < 1e-4) return;
+  const t = (WL - o.y) / d.y; if (t < 0) return;
+  const x = o.x + d.x * t, z = o.z + d.z * t;
+  if (!ocean.isWet(x, z)) return;
+  const kind = pick(['barrel', 'barrel', 'crate', 'crate', 'ring', 'bottle']);
+  const top = Math.min(4.5, Math.sqrt(Math.max(0, (innerR(x) - 0.8) ** 2 - z * z)));
+  spawnFloater(kind, x, top, z);
+}
+
+// =====================================================================
+//  MAIN LOOP
+// =====================================================================
+const clock = new THREE.Clock();
+const _g = new THREE.Vector3(), _iq = new THREE.Quaternion(), _sw = new THREE.Vector3(), _follow = new THREE.Vector3();
+let t = 0, frames = 0, perfAcc = 0, perfN = 0, ventT = 0, emberT = 3, boltT = 4;
+function frame() {
+  requestAnimationFrame(frame);
+  tick(Math.min(clock.getDelta(), 1 / 30));
+}
+function tick(dt) {
+  t += dt; U.uTime.value = t;
+  // weather + time of day
+  state.stormT = lerp(state.stormT, state.storm, 1 - Math.exp(-dt * 0.35));
+  const storm = state.stormT;
+  WIND.str = 1 + storm * 1.5 + (noise2(t * 0.25, 3.3) - 0.5) * (0.4 + storm);
+  U.uWave.value = 0.7 + WIND.str * 0.45;
+  if (state.cycle) { state.tod = (state.tod + dt / 160) % 1; $('tod').value = state.tod; }
+  const hh = Math.floor(state.tod * 24), mm = Math.floor((state.tod * 24 - hh) * 60);
+  if (frames % 15 === 0) $('clock').textContent = String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+  // bottle rocking on its cradle (damped pendulum) -> local gravity -> slosh target
+  if (state.rock && !tilt.drag) { tilt.tx = Math.sin(t * 0.75) * 0.16; tilt.tz = Math.sin(t * 0.5) * 0.035; }
+  else if (!tilt.drag) { tilt.tx = 0; tilt.tz = 0; }
+  tilt.vx += (9 * (tilt.tx - tilt.rx) - 1.2 * tilt.vx) * dt; tilt.rx += tilt.vx * dt;
+  tilt.vz += (14 * (tilt.tz - tilt.rz) - 2.0 * tilt.vz) * dt; tilt.rz += tilt.vz * dt;
+  tilt.shake = Math.max(0, tilt.shake - dt);
+  bottle.rotation.set(tilt.rx, 0, tilt.rz);
+  bottle.position.set(Math.sin(t * 60) * tilt.shake * 0.12, Math.cos(t * 47) * tilt.shake * 0.08, 0);
+  bottle.updateMatrixWorld(true);
+  U.uBInv.value.copy(bottle.matrixWorld).invert();
+  _iq.copy(bottle.quaternion).invert(); _g.set(0, -1, 0).applyQuaternion(_iq);
+  ocean.target.set(-_g.x / _g.y, -_g.z / _g.y);
+  // lighting
+  const L = updateSky(state.tod, storm, t);
+  U.uDay.value = L.day; U.uCaus.value = L.day * (1 - storm * 0.6) + 0.08;
+  glassMat.uniforms.uSun.value.copy(sunLight.position).normalize();
+  glassMat.uniforms.uSunCol.value.copy(sunLight.color).multiplyScalar(sunLight.intensity * 0.5);
+  glassMat.uniforms.uNight.value = L.night;
+  fx.uniforms.uSun.value.copy(sunLight.position).normalize(); fx.uniforms.uAmb.value = 0.55; fx.uniforms.uLight.value = 0.35 + 0.75 * L.day;
+  candleLight.intensity = (0.6 + L.night * 9) * (0.85 + 0.15 * Math.sin(t * 19) * Math.sin(t * 6.1));
+  candleLight.userData.flame.scale.set(1, 1 + Math.sin(t * 15) * 0.12, 1);
+  renderer.toneMappingExposure = 1.05 + L.night * 0.35;
+  bloomPass.strength = 0.42 + L.night * 0.38;
+  // physics + life
+  ocean.update(dt, t, storm);
+  ship.update(dt, t, storm);
+  stepFloaters(dt * 0.5); stepFloaters(dt * 0.5);
+  fishSchools.update(dt, t); dolphins.update(dt, t); turtle.update(dt, t); gulls.update(dt, t); crabs.update(dt, t);
+  for (const s of PROPS.swayers) { s.mesh.rotation.z = Math.sin(t * 1.2 + s.ph) * s.amp * (1 + storm * 2.5); s.mesh.rotation.x = Math.cos(t * 0.9 + s.ph) * s.amp * 0.7 * (1 + storm * 2.5); }
+  updateClouds(dt, storm);
+  // emitters: campfire, chimney, volcano, lava hissing, bubbles, fireflies
+  if (rand() < dt * 30) fx.fire(PROPS.fire.x, PROPS.fire.y, PROPS.fire.z);
+  if (rand() < dt * 1.4) fx.smoke(PROPS.chimney.x, PROPS.chimney.y, PROPS.chimney.z, 0.6, false);
+  ventT -= dt; if (ventT < 0) { ventT = rr(0.12, 0.3); fx.smoke(PROPS.vent.x, PROPS.vent.y + 0.15, PROPS.vent.z, 1, true); }
+  emberT -= dt; if (emberT < 0) { emberT = rr(4, 9); for (let i = 0; i < ri(5, 12); i++) fx.ember(PROPS.vent.x, PROPS.vent.y + 0.2, PROPS.vent.z, rr(-1, 1), rr(2.5, 4.5), rr(-1, 1)); }
+  for (const p of PROPS.lavaEnd || []) if (rand() < dt * 3) fx.steam(p.x, p.y, p.z);
+  for (const b of PROPS.bubblers) if (rand() < dt * 2.5) fx.bubble(b.x, b.y, b.z);
+  if (L.night > 0.6 && rand() < dt * 1.5) fx.firefly(ISL.x + rr(-2.5, 2.5), WL + rr(0.8, 2.2), ISL.z + rr(-1.5, 1.5));
+  if (storm > 0.6) { boltT -= dt; if (boltT < 0) { boltT = rr(2.5, 7); const c = pick(clouds).mesh.position; lightning.strike(c.x + rr(-1, 1), c.y - 0.4, c.z); } }
+  fx.update(dt); lightning.update(dt);
+  U.uFlash.value = lightning.flash;
+  hemi.intensity += lightning.flash * 2.5;
+  AUDIO.update(t, storm);
+  // camera
+  if (state.follow) {
+    bottle.localToWorld(_follow.set(ship.st.x, ship.st.y + 0.8, ship.st.z));
+    _sw.copy(_follow).sub(controls.target).multiplyScalar(1 - Math.exp(-dt * 2));
+    controls.target.add(_sw); camera.position.add(_sw);
+  }
+  controls.update();
+  composer.render();
+  // adaptive resolution keeps things smooth on slower GPUs
+  frames++; perfAcc += dt; perfN++;
+  if (perfN === 90) { const avg = perfAcc / perfN; perfAcc = 0; perfN = 0; if (avg > 1 / 38 && PR > 0.8) { PR = Math.max(0.75, PR - 0.25); renderer.setPixelRatio(PR); composer.setPixelRatio(PR); } }
+  if (frames === 2) $('loading').classList.add('done');
+}
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); bloomPass.resolution.set(innerWidth, innerHeight);
+});
+window.__bottle = { camera, controls, state, ship, ocean, fx, floaters, renderer, scene, bottle, tilt, get PR() { return PR; }, run(n, dt = 1 / 60) { for (let i = 0; i < n; i++) tick(dt); } };
+frame();
+</script>
+</body>
+</html>
