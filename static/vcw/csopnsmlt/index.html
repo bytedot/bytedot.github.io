@@ -54,6 +54,7 @@ button { cursor: pointer; }
 .r3 { --rc: var(--r3); --rc-rgb: var(--r3-rgb); }
 .r4 { --rc: var(--r4); --rc-rgb: var(--r4-rgb); }
 .num { font-variant-numeric: tabular-nums; }
+.show-sm { display: none; }
 .mono { font-family: var(--font-mono); font-size: .92em; }
 .good { color: var(--good); }
 .bad { color: var(--bad); }
@@ -299,10 +300,11 @@ tr:last-child td { border-bottom: 0; }
 .btn-danger.armed { background: #8f2e2a; border-color: #b8413b; color: #fff; }
 
 /* ---------- overlays */
-.overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; overflow-y: auto;
+.overlay { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
   padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .ov-backdrop { position: fixed; inset: 0; background: rgba(5, 7, 10, .8); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: fadeIn .25s ease both; }
 @keyframes fadeIn { from { opacity: 0; } }
+.overlay > .rv-card, .overlay > .modal-card { margin-block: auto; flex: none; }
 .modal-card { position: relative; width: min(980px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); animation: rise .3s cubic-bezier(.2, .8, .2, 1) both; }
 @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
@@ -380,18 +382,116 @@ tr:last-child td { border-bottom: 0; }
   .reel-wrap { --tile-w: 104px; --tile-h: 78px; }
   .topbar .icon-btn { order: 1; }
   .hud { width: 100%; order: 2; }
-  .hud-item { flex: 1 1 0; min-width: 0; padding: 3px 8px 4px; }
   .hud-item b { font-size: 13px; }
   .rv-specs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .batch-tiers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ratio-row, .ratio-axis { grid-template-columns: 96px minmax(0, 1fr) 100px; font-size: 12px; }
   .tabpanel { padding: 14px 12px; }
-  .stage-foot { justify-content: center; }
-  .keyinfo { width: 100%; justify-content: center; }
 }
 @media (max-width: 520px) {
   .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .facts { grid-template-columns: minmax(0, 1fr); }
+}
+/* ---------- touch & phone */
+button, label, select, input, summary { touch-action: manipulation; }
+body { -webkit-tap-highlight-color: transparent; }
+.stage img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+@media (hover: none) {
+  .card:hover .card-img { transform: none; box-shadow: inset 0 -3px 0 var(--rc); }
+  .inv-card:hover { background: var(--surface-2); }
+  .recent-row:hover { background: none; }
+  .card:active .card-img, .inv-card:active, .recent-row:active { filter: brightness(1.15); }
+}
+@media (max-width: 640px) {
+  .hide-sm { display: none; }
+  .show-sm { display: inline; }
+  th, td { padding: 6px 6px; }
+  td:first-child, th { white-space: nowrap; }
+  #wearBox td.wear-bar-cell { width: auto !important; min-width: 56px; }
+  #wearBox td.num { white-space: nowrap; }
+  .brand-name { font-size: 16px; }
+  .brand-mark { font-size: 13px; }
+  .hud { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+  .hud-item { padding: 4px 8px 5px; }
+  .hud-item span { font-size: 10.5px; }
+  .stage { border-radius: 8px; }
+  .stage-head { padding-top: 16px; }
+  .stage-title { font-size: 24px; }
+  .stage-sub { font-size: 14px; }
+  .stage-center { height: 176px; }
+  .case-model { width: min(236px, 66%); }
+  .contents-head { font-size: 12px; margin-bottom: 8px; }
+  .card-name b { font-size: 11.5px; }
+  .card-name small { font-size: 11px; }
+  .stage-foot { justify-content: flex-start; gap: 6px 10px; padding: 8px 12px calc(10px + env(safe-area-inset-bottom, 0px)); }
+  .keyinfo { width: 100%; justify-content: flex-start; gap: 8px; font-size: 12px; }
+  .keyinfo img { width: 30px; }
+  .keyinfo > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+  .actions { width: 100%; flex-wrap: nowrap; gap: 10px; }
+  #idleActions .btn-go { flex: 1 1 auto; min-height: 44px; padding-inline: 10px; }
+  #spinActions { justify-content: center; }
+  #skipBtn { flex: 1 1 auto; min-height: 44px; }
+  .qty select { min-height: 40px; }
+  .switch { font-size: 12.5px; gap: 6px; }
+  select, input[type="number"] { font-size: 16px; }
+  .tabs { padding: 0 4px; gap: 0; }
+  .tab { flex: 1 0 auto; padding: 13px 8px 11px; font-size: 14px; }
+  .panel { padding: 12px 12px 14px; }
+  .panel h3 { font-size: 15px; }
+  .kpi .val { font-size: 20px; }
+  .facts { gap: 8px; }
+  .fact .val { font-size: 16px; }
+  .chips { flex-wrap: nowrap; overflow-x: auto; width: 100%; padding-bottom: 2px; scrollbar-width: none; }
+  .chip { flex: none; min-height: 34px; }
+  .inv-sum { margin-left: 0; width: 100%; }
+  .inv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .knife-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .odds-table .frange { display: none; }
+  .odds-table td:first-child, .odds-table th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface-2); }
+  .odds-table tr.knife-head td { background: var(--surface-3); }
+  .odds-item { min-width: 168px; gap: 8px; }
+  .odds-table td img { width: 48px; height: 36px; }
+  .need-row { grid-template-columns: 64px minmax(0, 1fr) auto; font-size: 12.5px; }
+  .recent-row { grid-template-columns: 4px 46px minmax(0, 1fr) auto; gap: 8px; }
+  .recent-row img { width: 46px; height: 34px; }
+  .overlay { padding: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) 0 max(10px, env(safe-area-inset-left, 0px)); }
+  .modal-card { margin-bottom: max(10px, env(safe-area-inset-bottom, 0px)); }
+  .modal-head { padding: 12px 14px; }
+  .modal-head h2 { font-size: 16px; }
+  .modal-body { padding: 12px 14px 16px; }
+  .rv-kicker { font-size: 12px; }
+  .rv-img-wrap { width: min(86vw, calc(40vh * 4 / 3)); margin: 0 0 -6px; }
+  .rv-name { font-size: 22px; }
+  .rv-en { font-size: 12px; }
+  .rv-specs { gap: 6px; margin-top: 10px; }
+  .rv-spec { padding: 6px 9px; }
+  .rv-spec .val { font-size: 14px; }
+  .wear-scale { font-size: 10px; }
+  .rv-flavor { font-size: 13px; }
+  .rv-actions { position: sticky; bottom: 0; z-index: 2; width: 100%; flex-wrap: nowrap; margin-top: 10px; padding: 14px 0 max(12px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(180deg, rgba(5, 7, 11, 0), rgba(5, 7, 11, .94) 38%); }
+  .rv-actions .btn-go, .rv-actions .btn-ghost { flex: 1 1 0; min-height: 46px; padding-inline: 8px; }
+  .rv-actions .btn-ghost { flex: 0 1 34%; }
+}
+@media (max-width: 360px) {
+  .reel-wrap { --tile-w: 94px; --tile-h: 70px; }
+  .hud-item { padding-inline: 6px; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .stage-center { height: 170px; }
+  .overlay { padding-bottom: 0; }
+  .rv-rays { left: 27%; top: 45%; }
+  .rv-card { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); width: min(940px, 100%); column-gap: 22px; row-gap: 2px; justify-items: start; align-items: center; text-align: left; }
+  .rv-card > * { grid-column: 2; }
+  .rv-kicker { display: none; }
+  .rv-img-wrap { grid-column: 1; grid-row: 1 / span 9; width: 100%; margin: 0; }
+  .rv-name { font-size: 22px; margin-top: 2px; }
+  .rv-specs { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+  .rv-spec { padding: 5px 9px; }
+  .rv-spec .val { font-size: 14px; }
+  .wearbar, .wear-scale { width: 100%; }
+  .rv-flavor { margin-top: 4px; font-size: 13px; }
+  .rv-actions { position: sticky; bottom: 0; z-index: 2; width: 100%; flex-wrap: nowrap; justify-content: flex-start; margin-top: 8px; padding: 10px 0 max(8px, env(safe-area-inset-bottom, 0px)); background: linear-gradient(180deg, rgba(5, 7, 11, 0), rgba(5, 7, 11, .94) 38%); }
+  .rv-actions .btn-go, .rv-actions .btn-ghost { flex: 1 1 0; min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .case-model, .rv-rays, .rv-sway { animation: none !important; }
@@ -404,7 +504,7 @@ tr:last-child td { border-bottom: 0; }
       <span class="brand-mark" aria-hidden="true">CS2</span>
       <div>
         <span class="brand-name">梦魇武器箱 · 开箱模拟器</span>
-        <span class="brand-sub">Dreams &amp; Nightmares Case · 官方掉率与原版贴图 · 数据仅保存在本浏览器</span>
+        <span class="brand-sub">Dreams &amp; Nightmares Case<span class="hide-sm"> · 官方掉率与原版贴图 · 数据仅保存在本浏览器</span></span>
       </div>
     </div>
     <div class="hud" aria-label="本次会话汇总">
@@ -1051,6 +1151,7 @@ function showReveal(o, inspect = false) {
   document.body.style.overflow = 'hidden';
   if (!inspect) {
     Snd.reveal(it.tier);
+    if (it.tier === 4 && settings.sound) { try { if (navigator.vibrate) navigator.vibrate([70, 50, 150]); } catch (e) { /* not allowed here */ } }
     $('#live').textContent = `获得 ${marketZh(it, o.st, w)}，参考价 ${yuan(valueOf(o))}`;
   }
   lastFocus = inspect ? document.activeElement : null;
@@ -1176,7 +1277,8 @@ function refreshAll() {
 function renderHUD() {
   const s = stats();
   $('#hudN').textContent = nf0.format(s.n);
-  const yh = (v) => (Math.abs(v) < 1e5 ? yuan(v) : yuanC(v));
+  const lim = window.matchMedia && matchMedia('(max-width: 640px)').matches ? 1e3 : 1e5;
+  const yh = (v) => (Math.abs(v) < lim ? yuan(v) : yuanC(v));
   $('#hudCost').textContent = yh(s.totalCost);
   $('#hudVal').textContent = yh(s.value);
   const net = $('#hudNet'); net.textContent = (s.net > 0 ? '+' : '') + yh(s.net);
@@ -1208,8 +1310,8 @@ function renderStats() {
   TIERS.forEach((t, j) => sl.append(h('span', { style: `flex:${Math.max(ev.per[j], 0.0001)} 1 0`, text: `${j === 4 ? '★ 刀' : t.short} ${pct(ev.per[j] / ev.ev, 0)}` })));
   requestAnimationFrame(() => { for (const x of sl.children) x.classList.toggle('off', x.scrollWidth > x.clientWidth + 1); });
   const et = $('#evTable'); et.textContent = '';
-  et.append(h('thead', null, h('tr', null, h('th', { text: '稀有度' }), h('th', { class: 'num', text: '档位概率' }), h('th', { class: 'num', text: '平均价值' }), h('th', { class: 'num', text: '每箱贡献' }), h('th', { class: 'num', text: '占比' }))),
-    h('tbody', null, TIERS.map((t, j) => h('tr', { class: 'r' + j }, h('td', null, h('span', { class: 'swatch' }), t.zh), h('td', { class: 'num', text: pct(t.p, 2) }), h('td', { class: 'num', text: yuan(ev.avg[j]) }), h('td', { class: 'num', text: yuan(ev.per[j]) }), h('td', { class: 'num', text: pct(ev.per[j] / ev.ev) })))));
+  et.append(h('thead', null, h('tr', null, h('th', { text: '稀有度' }), h('th', { class: 'num hide-sm', text: '档位概率' }), h('th', { class: 'num', text: '平均价值' }), h('th', { class: 'num', text: '每箱贡献' }), h('th', { class: 'num', text: '占比' }))),
+    h('tbody', null, TIERS.map((t, j) => h('tr', { class: 'r' + j }, h('td', null, h('span', { class: 'swatch' }), h('span', { class: 'hide-sm', text: t.zh }), h('span', { class: 'show-sm', text: j === 4 ? '★ 刀' : t.zh })), h('td', { class: 'num hide-sm', text: pct(t.p, 2) }), h('td', { class: 'num', text: yuan(ev.avg[j]) }), h('td', { class: 'num', text: yuan(ev.per[j]) }), h('td', { class: 'num', text: pct(ev.per[j] / ev.ev) })))));
   renderRatio(s); renderGold(s); renderPL(s); renderWear(s); renderRecent(s);
   if (!mcState.result && !mcState.running) runMC();
   else if (mcState.result) renderMC();
@@ -1264,7 +1366,7 @@ function renderWear(s) {
     h('tbody', null, WEARS.map((w, k) => {
       const tr = h('tr', { tabindex: '0' },
         h('td', { text: w.zh }),
-        h('td', { style: 'width:46%' }, h('div', { style: 'position:relative;height:12px' },
+        h('td', { class: 'wear-bar-cell', style: 'width:46%' }, h('div', { style: 'position:relative;height:12px' },
           h('div', { style: `position:absolute;left:0;top:1px;height:10px;border-radius:0 4px 4px 0;background:var(--series);width:${s.wearCount[k] / maxV * 100}%` }),
           h('div', { style: `position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink-2);left:calc(${s.wearExp[k] / maxV * 100}% - 1px)` }))),
         h('td', { class: 'num', text: `${nf0.format(s.wearCount[k])}（${pct(s.wearCount[k] / s.n)}）` }),
@@ -1359,11 +1461,15 @@ function renderPL(st) {
       tipRow(yuanS(slope * (cur + 1)), '理论期望', 'var(--ref)'),
       tipRow(yuan(st.vals[cur]), `本箱：${weaponZh(it)} | ${skinZh(it)}`)]);
   };
-  const hide = () => { cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); hideTip(); };
-  hit.addEventListener('pointermove', (e) => { const r = svg.getBoundingClientRect(); const x = (e.clientX - r.left) * (W / r.width); show(Math.round(((x - m.l) / pw) * (n - 1)), e.clientX, e.clientY); });
-  hit.addEventListener('pointerleave', hide);
+  const unmark = () => { cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); };
+  const hide = () => { unmark(); hideTip(); };
+  const at = (e) => { const r = svg.getBoundingClientRect(); const x = (e.clientX - r.left) * (W / r.width); show(Math.round(((x - m.l) / pw) * (n - 1)), e.clientX, e.clientY); tipCleanup = unmark; };
+  hit.style.touchAction = 'pan-y';
+  hit.addEventListener('pointermove', at);
+  hit.addEventListener('pointerdown', (e) => { at(e); if (e.pointerType !== 'mouse') tipOwner = hit; });
+  hit.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hide(); });
   hit.addEventListener('focus', () => show(cur));
-  hit.addEventListener('blur', hide);
+  hit.addEventListener('blur', () => { if (tipOwner !== hit) hide(); });
   hit.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); show(cur + (e.key === 'ArrowLeft' ? -1 : 1) * Math.max(1, Math.round(n / 100))); } });
   // table view (sampled)
   const step = Math.max(1, Math.ceil(n / 40)), rows = [];
@@ -1455,12 +1561,17 @@ function showTip(x, y, rows) {
   if (top + r.height > vh - 8) top = y - r.height - 14;
   tip.style.left = Math.max(8, left) + 'px'; tip.style.top = Math.max(8, top) + 'px';
 }
-function hideTip() { tip.hidden = true; }
+let tipOwner = null, tipCleanup = null;
+function hideTip() { tip.hidden = true; tipOwner = null; if (tipCleanup) { const f = tipCleanup; tipCleanup = null; f(); } }
+// touch: a tap shows the tooltip and it stays until the next tap elsewhere or a scroll
+document.addEventListener('pointerdown', (e) => { if (!tip.hidden && e.pointerType !== 'mouse' && !(tipOwner && tipOwner.contains(e.target))) hideTip(); }, true);
+window.addEventListener('scroll', () => { if (!tip.hidden) hideTip(); }, { passive: true });
 function bindTip(el, rowsFn) {
-  el.addEventListener('pointermove', (e) => showTip(e.clientX, e.clientY, rowsFn()));
-  el.addEventListener('pointerleave', hideTip);
-  el.addEventListener('focus', () => { const r = el.getBoundingClientRect(); showTip(r.left + r.width / 2, r.top, rowsFn()); });
-  el.addEventListener('blur', hideTip);
+  el.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') showTip(e.clientX, e.clientY, rowsFn()); });
+  el.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') { showTip(e.clientX, e.clientY, rowsFn()); tipOwner = el; } });
+  el.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hideTip(); });
+  el.addEventListener('focus', () => { if (tipOwner === el) return; const r = el.getBoundingClientRect(); showTip(r.left + r.width / 2, r.top, rowsFn()); });
+  el.addEventListener('blur', () => { if (tipOwner !== el) hideTip(); });
 }
 
 /* ================= inventory ================= */
@@ -1614,7 +1725,7 @@ function bind() {
     opens = []; saveNow(); mcState.result = null; refreshAll(); toast('已清空全部开箱记录');
   });
   let rz = 0;
-  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (ui.tab === 'stats') { renderPL(stats()); renderMC(); } }, 150); });
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { renderHUD(); if (ui.tab === 'stats') { renderPL(stats()); renderMC(); } }, 150); });
 }
 
 /* ================= boot ================= */
