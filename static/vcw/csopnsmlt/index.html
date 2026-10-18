@@ -725,6 +725,7 @@ function rollIndex() {
   const pool = POOLS[t], q = rng(); let j = 0; while (j < pool.cum.length - 1 && q >= pool.cum[j]) j++;
   return pool.idx[j];
 }
+function fillerIndex() { let i; do { i = rollIndex(); } while (ITEMS[i].tier === 4); return i; }
 function genFloat(it) {
   const r = rng(); let acc = 0, seg = WEAR_DIST[4];
   for (const s of WEAR_DIST) { acc += s[2]; if (r < acc) { seg = s; break; } }
@@ -968,7 +969,8 @@ function makeTile(it) {
 function spin(res, done) {
   reel.textContent = ''; reel.classList.remove('landed');
   const frag = document.createDocumentFragment();
-  for (let k = 0; k < REEL_LEN; k++) frag.append(makeTile(ITEMS[k === WIN_AT ? res.i : rollIndex()]));
+  // filler tiles never show the gold coin: it only appears when this case really is a gold, on the tile the reel stops on
+  for (let k = 0; k < REEL_LEN; k++) frag.append(makeTile(ITEMS[k === WIN_AT ? res.i : fillerIndex()]));
   reel.append(frag);
   const sc = $('.stage-center'), foot = $('.stage-foot');
   const scr = sc.getBoundingClientRect(), wr = reelWrap.getBoundingClientRect();
@@ -1525,6 +1527,7 @@ function renderOdds() {
     ['StatTrak™', '任意物品均有 10% 概率为 StatTrak™ 版本（刀为 ★ StatTrak™）。'],
     ['磨损', '先按 3% / 24% / 33% / 24% / 16% 抽取磨损区段，在区段内均匀取值，再映射到该皮肤自己的磨损区间。所以伽玛多普勒（0.00–0.08）约 96% 为崭新出厂。'],
     ['图案模板', '0–1000 随机整数，影响图案位置，本模拟不按模板单独定价。'],
+    ['开箱动画', '滚动条里只有本箱真正出金时才会出现金色图标，并且一定停在它上面；没出金的箱子，滚动条里不会出现金色。结果在点击开箱时就已决定，动画只负责展示。'],
     ['武器箱信息', '梦魇武器箱（crate_community_30，系列 #339），2022 年 1 月随“梦魇”创意工坊比赛作品推出，钥匙不可交易。'],
   ].forEach(([b, t]) => notes.append(h('li', null, h('b', { text: b + '：' }), t)));
 }
