@@ -1,0 +1,1640 @@
+<title>梦魇武器箱开箱模拟器</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="CS2 梦魇武器箱开箱模拟：官方掉率、原版贴图、开箱动画、成本与结果统计">
+<style>
+/* Layout: the CS2 "解锁容器" screen is the hero and the simulator itself; an analysis desk with four tabs sits under it.
+   One committed dark look, like the game UI. Rarity colours are Valve's own. */
+:root {
+  color-scheme: dark;
+  --bg: #0b0e12;
+  --surface: #131920;
+  --surface-2: #1a2129;
+  --surface-3: #242e38;
+  --line: #29333e;
+  --ink: #e8edf2;
+  --ink-2: #a9b4bf;
+  --ink-3: #788490;
+  --go: #4b9426;
+  --go-hi: #5fae33;
+  --st: #cf6a32;
+  --good: #3cc35a;
+  --bad: #f0625a;
+  --series: #3987e5;
+  --ref: #8b9199;
+  --grid: #253039;
+  --axis: #3a4652;
+  --marker: #f3c64a;
+  --r0: #4b69ff; --r0-rgb: 75, 105, 255;
+  --r1: #8847ff; --r1-rgb: 136, 71, 255;
+  --r2: #d32ce6; --r2-rgb: 211, 44, 230;
+  --r3: #eb4b4b; --r3-rgb: 235, 75, 75;
+  --r4: #e4ae39; --r4-rgb: 228, 174, 57;
+  --font-ui: "Barlow Semi Condensed", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", "Hiragino Sans GB", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SFMono-Regular", Menlo, monospace;
+  --radius: 6px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.5 var(--font-ui);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px 48px;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid #8fb8ff; outline-offset: 2px; }
+.r0 { --rc: var(--r0); --rc-rgb: var(--r0-rgb); }
+.r1 { --rc: var(--r1); --rc-rgb: var(--r1-rgb); }
+.r2 { --rc: var(--r2); --rc-rgb: var(--r2-rgb); }
+.r3 { --rc: var(--r3); --rc-rgb: var(--r3-rgb); }
+.r4 { --rc: var(--r4); --rc-rgb: var(--r4-rgb); }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-size: .92em; }
+.good { color: var(--good); }
+.bad { color: var(--bad); }
+.muted { color: var(--ink-3); }
+.app { max-width: 1240px; margin: 0 auto; display: grid; gap: 14px; }
+
+/* ---------- top bar */
+.topbar { display: flex; align-items: center; gap: 12px 16px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; flex: 1 1 260px; }
+.brand-mark { font-weight: 700; font-size: 14px; letter-spacing: .08em; padding: 2px 7px; border: 1.5px solid #c9d2db; border-radius: 4px; }
+.brand-name { display: block; font-size: 17px; font-weight: 700; letter-spacing: .02em; line-height: 1.2; }
+.brand-sub { display: block; color: var(--ink-3); font-size: 12px; }
+.hud { display: flex; gap: 6px; flex-wrap: wrap; }
+.hud-item { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 3px 10px 4px; min-width: 82px; }
+.hud-item span { display: block; font-size: 11px; color: var(--ink-3); letter-spacing: .04em; }
+.hud-item b { display: block; font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.icon-btn { width: 40px; height: 40px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); display: grid; place-items: center; color: var(--ink-2); }
+.icon-btn:hover { color: var(--ink); border-color: #3b4855; }
+.icon-btn svg { width: 20px; height: 20px; }
+.icon-btn[aria-pressed="false"] .on, .icon-btn[aria-pressed="true"] .off { display: none; }
+
+/* ---------- stage: the CS2 unlock-container screen */
+.stage { position: relative; overflow: hidden; overflow: clip; border-radius: 10px; border: 1px solid #2c3541; isolation: isolate; background: #1b1c28; }
+.stage-bg { position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(46% 40% at 50% 34%, rgba(255, 214, 232, .13), transparent 72%),
+    radial-gradient(24% 20% at 12% 20%, rgba(255, 186, 112, .22), transparent 72%),
+    radial-gradient(20% 17% at 88% 16%, rgba(118, 168, 255, .22), transparent 72%),
+    radial-gradient(30% 24% at 82% 66%, rgba(196, 112, 226, .17), transparent 72%),
+    radial-gradient(28% 22% at 16% 72%, rgba(86, 160, 204, .13), transparent 72%),
+    linear-gradient(180deg, #3b4156 0%, #35354b 32%, #2a2a3b 58%, #19192300 100%),
+    #191923; }
+.stage-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(130% 95% at 50% 36%, transparent 52%, rgba(0, 0, 0, .5) 100%); }
+.stage-head { text-align: center; padding: 22px 16px 0; position: relative; z-index: 3; }
+.stage-title { margin: 0; font-size: clamp(26px, 3.4vw, 36px); font-weight: 600; letter-spacing: .01em; color: #f4f6f8; text-shadow: 0 2px 14px rgba(0, 0, 0, .4); text-wrap: balance; }
+.stage-sub { margin: 0; font-size: 16px; color: #d6dbe1; }
+.stage-sub b { font-weight: 700; color: #fff; }
+.stage-note { margin: 3px 0 0; font-size: 12px; color: #b7c0c9; display: inline-flex; gap: 6px; align-items: center; }
+.stage-note svg { width: 13px; height: 13px; }
+.stage-center { position: relative; height: clamp(196px, 25vw, 262px); display: grid; place-items: center; transition: transform .5s cubic-bezier(.2, .8, .2, 1); }
+.stage.spinning .stage-center { transform: translateY(var(--shift, 0px)); }
+.case-floor { position: absolute; left: 50%; top: 78%; width: min(300px, 62%); height: 34px; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(0, 0, 0, .55), transparent); filter: blur(2px); transition: opacity .35s; }
+.case-model { position: relative; width: min(312px, 64%); height: auto; transform-origin: 50% 80%; animation: caseIdle 6s ease-in-out infinite; transition: opacity .4s, transform .5s, filter .4s; filter: drop-shadow(0 16px 18px rgba(0, 0, 0, .45)); }
+@keyframes caseIdle { 0%, 100% { translate: 0 0; rotate: -.5deg; } 50% { translate: 0 -6px; rotate: .5deg; } }
+.disc { position: absolute; left: 50%; top: 60%; width: min(600px, 132vw); aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%) scale(.8); background: radial-gradient(closest-side, rgba(8, 10, 16, .66), rgba(8, 10, 16, .55) 84%, rgba(8, 10, 16, .0) 100%); opacity: 0; transition: opacity .4s, transform .6s cubic-bezier(.2, .8, .2, 1); pointer-events: none; z-index: 1; }
+.reel-wrap { --tile-w: 150px; --tile-h: 112px; --tile-gap: 4px; position: absolute; left: 0; right: 0; top: 60%; height: var(--tile-h); margin-top: calc(var(--tile-h) / -2); opacity: 0; z-index: 2; pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,.16) 0%, rgba(0,0,0,.42) 20%, #000 34%, #000 66%, rgba(0,0,0,.42) 80%, rgba(0,0,0,.16) 100%);
+  mask-image: linear-gradient(90deg, rgba(0,0,0,.16) 0%, rgba(0,0,0,.42) 20%, #000 34%, #000 66%, rgba(0,0,0,.42) 80%, rgba(0,0,0,.16) 100%); }
+.reel { position: absolute; left: 0; top: 0; display: flex; gap: var(--tile-gap); will-change: transform; }
+.tile { flex: 0 0 var(--tile-w); height: var(--tile-h); position: relative; border-radius: 2px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(222, 228, 236, .36) 0%, rgba(176, 184, 194, .26) 52%, rgba(var(--rc-rgb), .58) 100%);
+  box-shadow: inset 0 -5px 0 var(--rc); transition: filter .3s, opacity .3s; }
+.tile img { position: absolute; left: 6%; top: 5%; width: 88%; height: 82%; object-fit: contain; filter: drop-shadow(0 4px 5px rgba(0, 0, 0, .35)); }
+.tile.r4 { background: linear-gradient(180deg, #f3d77f 0%, #d9ab3d 56%, #a97a1a 100%); }
+.tile.r4 img { left: 15%; top: 8%; width: 70%; height: 80%; filter: drop-shadow(0 3px 4px rgba(70, 40, 0, .45)); }
+.reel.landed .tile { filter: brightness(.55) saturate(.7); }
+.reel.landed .tile.win { filter: none; box-shadow: inset 0 -5px 0 var(--rc), 0 0 0 2px rgba(255, 255, 255, .7), 0 0 26px rgba(var(--rc-rgb), .8); }
+.marker { position: absolute; left: 50%; top: -7px; bottom: -7px; width: 2px; margin-left: -1px; background: var(--marker); box-shadow: 0 0 8px rgba(243, 198, 74, .8); }
+.marker::before, .marker::after { content: ""; position: absolute; left: -5px; border: 6px solid transparent; }
+.marker::before { top: -6px; border-top-color: var(--marker); }
+.marker::after { bottom: -6px; border-bottom-color: var(--marker); }
+.stage.spinning .disc { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.stage.spinning .reel-wrap { opacity: 1; transition: opacity .25s .05s; }
+.stage.spinning .case-model { opacity: .4; transform: translateY(-20px) scale(.93); filter: blur(1.5px) drop-shadow(0 16px 18px rgba(0, 0, 0, .45)); animation-play-state: paused; }
+.stage.spinning .case-floor { opacity: 0; }
+.stage.spinning .contents { opacity: 0; transform: translateY(10px); pointer-events: none; visibility: hidden; transition: opacity .25s, transform .25s, visibility 0s .25s; }
+
+.contents { position: relative; z-index: 3; padding: 2px 22px 14px; transition: opacity .3s, transform .3s; }
+.contents-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 13px; color: #d4dae0; padding: 4px 2px 6px; border-bottom: 1px solid rgba(255, 255, 255, .13); margin-bottom: 10px; }
+.link-btn { background: none; border: 0; color: #d4dae0; font-weight: 700; letter-spacing: .08em; font-size: 12px; padding: 4px 8px; border-radius: 4px; }
+.link-btn:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.grid { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 12px 10px; }
+.card { display: flex; flex-direction: column; gap: 4px; background: none; border: 0; padding: 0; text-align: left; min-width: 0; color: inherit; }
+.card-img { position: relative; display: block; aspect-ratio: 4 / 3; border-radius: 3px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(225, 231, 238, .30), rgba(165, 173, 183, .17) 58%, rgba(var(--rc-rgb), .42));
+  box-shadow: inset 0 -3px 0 var(--rc); transition: transform .15s, box-shadow .15s; }
+.card:hover .card-img, .card:focus-visible .card-img { transform: translateY(-2px); box-shadow: inset 0 -3px 0 var(--rc), 0 0 0 1px rgba(255, 255, 255, .4), 0 8px 16px rgba(0, 0, 0, .35); }
+.card-img img { position: absolute; left: 6%; top: 7%; width: 88%; height: 80%; object-fit: contain; }
+.card.r4 .card-img { background: linear-gradient(180deg, #f1d47a 0%, #d6a83b 56%, #a6771a 100%); }
+.card.r4 .card-img img { left: 16%; top: 8%; width: 68%; height: 80%; }
+.card-name { display: block; line-height: 1.25; min-width: 0; }
+.card-name b { display: block; font-size: 12px; font-weight: 700; color: #eef1f4; overflow-wrap: anywhere; }
+.card-name small { display: block; font-size: 11.5px; color: #b8c0c8; overflow-wrap: anywhere; }
+
+.stage-foot { position: sticky; bottom: 0; z-index: 4; display: flex; align-items: center; justify-content: space-between; gap: 10px 18px; flex-wrap: wrap; padding: 12px 22px calc(12px + env(safe-area-inset-bottom, 0px)); background: rgba(14, 15, 22, .9); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-top: 1px solid rgba(255, 255, 255, .08); border-radius: 0 0 10px 10px; }
+.keyinfo { display: flex; align-items: center; gap: 10px; color: #d0d7de; font-size: 13px; min-width: 0; }
+.keyinfo img { width: 44px; height: auto; flex: none; }
+.keyinfo b { color: #fff; }
+.keyinfo .cost { display: block; color: var(--ink-3); font-size: 12px; }
+.actions { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; }
+.qty { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #d0d7de; }
+.qty select { background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .16); border-radius: 3px; padding: 6px 8px; color: #fff; }
+.qty select option { background: #1a2129; }
+.btn-go { background: linear-gradient(180deg, var(--go-hi), var(--go)); color: #fff; border: 0; border-radius: 3px; padding: 9px 22px; font-weight: 700; letter-spacing: .1em; font-size: 14px; box-shadow: 0 2px 0 rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .22); white-space: nowrap; }
+.btn-go:hover { filter: brightness(1.1); }
+.btn-go:disabled { filter: grayscale(.7) brightness(.75); cursor: default; }
+.btn-ghost { background: transparent; color: #d7dde3; border: 1px solid rgba(255, 255, 255, .2); border-radius: 3px; padding: 8px 16px; font-weight: 600; letter-spacing: .06em; white-space: nowrap; }
+.btn-ghost:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+.spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .25); border-top-color: #fff; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #d4dae0; cursor: pointer; user-select: none; }
+.switch input { appearance: none; -webkit-appearance: none; width: 34px; height: 18px; border-radius: 9px; background: #3b4552; position: relative; transition: background .2s; margin: 0; flex: none; cursor: pointer; }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #cdd5dc; transition: transform .2s; }
+.switch input:checked { background: var(--go); }
+.switch input:checked::after { transform: translateX(16px); background: #fff; }
+.live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- desk */
+.desk { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.tabs { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 12px 12px 10px; color: var(--ink-2); font-weight: 600; font-size: 15px; letter-spacing: .02em; white-space: nowrap; }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.tab .count { color: var(--ink-3); font-weight: 500; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.tabpanel { padding: 18px; min-width: 0; }
+.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.kpi { background: var(--surface-2); border-radius: 8px; padding: 10px 12px 11px; min-width: 0; }
+.kpi .lab { font-size: 12px; color: var(--ink-3); letter-spacing: .02em; }
+.kpi .val { font-size: 23px; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.kpi .sub { font-size: 12px; color: var(--ink-2); }
+.cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.panel { background: var(--surface-2); border-radius: 8px; padding: 14px 16px 16px; min-width: 0; }
+.panel.span-2 { grid-column: 1 / -1; }
+.panel h3 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: .01em; text-wrap: balance; }
+.panel .desc { margin: 2px 0 12px; color: var(--ink-3); font-size: 12.5px; max-width: 72ch; }
+.panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px 16px; flex-wrap: wrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin: 0 0 8px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.key-line { width: 16px; height: 2px; background: var(--series); border-radius: 1px; }
+.key-dash { width: 16px; height: 0; border-top: 2px dashed var(--ref); }
+.key-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--r4); }
+.key-bar { width: 10px; height: 10px; border-radius: 2px; background: var(--series); }
+.chart { position: relative; min-height: 120px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--ink-3); font-size: 11px; font-family: var(--font-ui); }
+.empty { display: grid; place-items: center; min-height: 160px; border: 1px dashed var(--line); border-radius: 8px; color: var(--ink-3); font-size: 13px; padding: 16px; text-align: center; }
+details.table-view { margin-top: 10px; font-size: 12.5px; }
+details.table-view summary { cursor: pointer; color: var(--ink-2); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+th { color: var(--ink-3); font-weight: 600; font-size: 12px; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--rc); margin-right: 6px; vertical-align: -1px; }
+
+/* stacked EV bar */
+.stack { display: flex; gap: 2px; height: 22px; margin: 4px 0 10px; }
+.stack > div { background: var(--rc); min-width: 3px; }
+.stack > div:first-child { border-radius: 4px 0 0 4px; }
+.stack > div:last-child { border-radius: 0 4px 4px 0; }
+.stack > div:hover { filter: brightness(1.2); }
+.stack-labels { display: flex; gap: 2px; margin: -4px 0 10px; font-size: 12px; color: var(--ink-2); }
+.stack-labels > span { min-width: 3px; overflow: hidden; white-space: nowrap; text-align: center; font-variant-numeric: tabular-nums; }
+.stack-labels > span.off { visibility: hidden; }
+
+/* ratio bars */
+.ratio-rows { display: grid; gap: 10px; }
+.ratio-row { display: grid; grid-template-columns: 112px minmax(0, 1fr) 132px; gap: 10px; align-items: center; font-size: 13px; }
+.ratio-track { position: relative; height: 12px; }
+.ratio-track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--grid); }
+.ratio-bar { position: absolute; left: 0; top: 1px; height: 10px; border-radius: 0 4px 4px 0; background: var(--rc); }
+.ratio-ref { position: absolute; top: -4px; bottom: -4px; width: 1.5px; background: var(--ink-2); }
+.ratio-axis { display: grid; grid-template-columns: 112px minmax(0, 1fr) 132px; gap: 10px; font-size: 11px; color: var(--ink-3); }
+.ratio-axis .ticks { position: relative; height: 14px; }
+.ratio-axis .ticks span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.ratio-val { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+.ratio-val b { color: var(--ink); font-weight: 600; }
+
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fact { background: var(--surface-3); border-radius: 6px; padding: 9px 11px; min-width: 0; }
+.fact .lab { font-size: 12px; color: var(--ink-3); }
+.fact .val { font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.fact .sub { font-size: 12px; color: var(--ink-2); }
+.need { margin-top: 12px; }
+.need-row { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.need-row:last-child { border-bottom: 0; }
+.need-bar { height: 8px; border-radius: 0 4px 4px 0; background: var(--r4); max-width: 100%; }
+
+.recent { display: grid; gap: 6px; }
+.recent-row { display: grid; grid-template-columns: 4px 54px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 13px; background: none; border: 0; padding: 4px 6px 4px 0; text-align: left; border-radius: 4px; color: inherit; }
+.recent-row:hover { background: var(--surface-3); }
+.recent-row .bar { align-self: stretch; background: var(--rc); border-radius: 2px; }
+.recent-row img { width: 54px; height: 40px; object-fit: contain; }
+.recent-row .nm { min-width: 0; line-height: 1.3; }
+.recent-row .nm b { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.recent-row .nm span { color: var(--ink-3); font-size: 12px; }
+.recent-row .pr { font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+.st-tag { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; background: var(--st); border-radius: 2px; padding: 0 4px; margin-right: 4px; letter-spacing: .02em; vertical-align: 1px; }
+
+.mc-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { background: transparent; border: 0; padding: 6px 12px; color: var(--ink-2); font-weight: 600; font-variant-numeric: tabular-nums; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--ink); }
+.mc-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+
+/* inventory */
+.toolbar { display: flex; gap: 8px 12px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-size: 13px; color: var(--ink-2); }
+.chip .swatch { margin-right: 0; }
+.chip[aria-pressed="true"] { border-color: #6b7a88; color: var(--ink); background: var(--surface-3); }
+.select { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; color: var(--ink); }
+.inv-sum { margin-left: auto; color: var(--ink-2); font-size: 13px; }
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.inv-card { position: relative; display: grid; gap: 6px; background: var(--surface-2); border: 0; border-radius: 6px; padding: 0 0 9px; text-align: left; color: inherit; overflow: hidden; min-width: 0; }
+.inv-card:hover { background: var(--surface-3); }
+.inv-img { position: relative; aspect-ratio: 4 / 3; background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(var(--rc-rgb), .30)); box-shadow: inset 0 -3px 0 var(--rc); }
+.inv-img img { position: absolute; left: 6%; top: 6%; width: 88%; height: 84%; object-fit: contain; }
+.inv-meta { padding: 0 9px; display: grid; gap: 1px; font-size: 12.5px; line-height: 1.3; min-width: 0; }
+.inv-meta b { font-weight: 600; overflow-wrap: anywhere; }
+.inv-meta span { color: var(--ink-3); }
+.inv-meta .pr { color: var(--ink); font-variant-numeric: tabular-nums; }
+.inv-card .st-tag { position: absolute; top: 6px; left: 6px; }
+.more { display: flex; justify-content: center; margin-top: 14px; }
+
+/* odds */
+.odds-table td img { width: 64px; height: 48px; object-fit: contain; display: block; }
+.odds-item { display: flex; align-items: center; gap: 10px; min-width: 210px; }
+.odds-item .nm b { display: block; font-weight: 600; }
+.odds-item .nm span { color: var(--ink-3); font-size: 12px; }
+.frange { position: relative; width: 110px; height: 6px; border-radius: 3px; background: var(--surface-3); }
+.frange i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: var(--ink-2); }
+.knife-head td { background: var(--surface-3); font-weight: 700; color: var(--ink); }
+.est { color: var(--ink-3); font-size: 11px; margin-left: 2px; }
+.notes { margin: 14px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; display: grid; gap: 6px; max-width: 90ch; }
+.notes b { color: var(--ink); }
+
+/* settings */
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.field { background: var(--surface-2); border-radius: 8px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.field > label, .field > .lab { font-weight: 700; font-size: 14px; }
+.field .hint { color: var(--ink-3); font-size: 12.5px; }
+.radio { display: flex; align-items: flex-start; gap: 8px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
+.radio input { margin: 3px 0 0; accent-color: var(--go-hi); }
+.radio b { color: var(--ink); font-weight: 600; }
+.money { display: flex; align-items: center; gap: 6px; }
+.money input { width: 120px; background: var(--surface-3); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-variant-numeric: tabular-nums; }
+.btn-plain { background: var(--surface-3); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; color: var(--ink); font-weight: 600; }
+.btn-plain:hover { border-color: #4a5866; }
+.btn-danger { background: transparent; border: 1px solid #6b3434; color: #ff9b94; border-radius: 6px; padding: 7px 12px; font-weight: 600; }
+.btn-danger.armed { background: #8f2e2a; border-color: #b8413b; color: #fff; }
+
+/* ---------- overlays */
+.overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; overflow-y: auto;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.ov-backdrop { position: fixed; inset: 0; background: rgba(5, 7, 10, .8); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); animation: fadeIn .25s ease both; }
+@keyframes fadeIn { from { opacity: 0; } }
+.modal-card { position: relative; width: min(980px, 100%); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); animation: rise .3s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.modal-body { padding: 16px 18px 18px; }
+.close-x { width: 34px; height: 34px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink-2); font-size: 18px; line-height: 1; }
+.close-x:hover { color: var(--ink); }
+
+.reveal { z-index: 70; }
+.reveal .ov-backdrop { background: radial-gradient(70% 62% at 50% 38%, rgba(var(--rc-rgb), .30), rgba(5, 7, 11, .94) 72%); }
+.rv-rays { position: fixed; left: 50%; top: 36%; width: 1400px; height: 1400px; margin: -700px 0 0 -700px; pointer-events: none;
+  background: repeating-conic-gradient(from 0deg, rgba(var(--rc-rgb), .15) 0deg 5deg, transparent 5deg 15deg);
+  -webkit-mask-image: radial-gradient(closest-side, #000 12%, transparent 62%); mask-image: radial-gradient(closest-side, #000 12%, transparent 62%);
+  animation: spin 50s linear infinite, fadeIn .8s ease both; }
+.reveal.r0 .rv-rays, .reveal.r1 .rv-rays { opacity: .55; }
+.rv-card { position: relative; width: min(760px, 100%); display: grid; justify-items: center; text-align: center; gap: 4px; }
+.rv-kicker { font-size: 13px; letter-spacing: .3em; color: rgba(255, 255, 255, .72); animation: rise .4s .1s both; }
+.rv-img-wrap { position: relative; width: min(540px, 88vw); aspect-ratio: 4 / 3; perspective: 900px; margin: -6px 0 -10px; }
+.rv-glow { position: absolute; inset: 12% 8%; border-radius: 50%; background: radial-gradient(closest-side, rgba(var(--rc-rgb), .55), transparent); filter: blur(10px); animation: glowIn .8s ease both; }
+@keyframes glowIn { from { opacity: 0; transform: scale(.4); } }
+.rv-sway { position: absolute; inset: 0; animation: sway 7s .6s ease-in-out infinite; transform-style: preserve-3d; }
+@keyframes sway { 0%, 100% { transform: rotateY(-11deg) rotateZ(-1deg); } 50% { transform: rotateY(11deg) rotateZ(1deg) translateY(-8px); } }
+.rv-img-wrap img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 20px 28px rgba(0, 0, 0, .6)); animation: pop .6s cubic-bezier(.2, .9, .25, 1.15) both; }
+@keyframes pop { from { opacity: 0; transform: scale(.7) translateY(24px); } }
+.rv-sparks { position: absolute; inset: 0; pointer-events: none; }
+.rv-sparks i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #fff3c4; box-shadow: 0 0 10px 2px rgba(255, 210, 90, .85); opacity: 0; animation: spark 1.6s ease-out both; }
+@keyframes spark { 0% { opacity: 0; transform: translate(0, 0) scale(.4); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1); } }
+.rv-tier { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; letter-spacing: .08em; color: #fff; animation: rise .4s .25s both; }
+.rv-tier .pill { background: var(--rc); padding: 2px 10px; border-radius: 2px; }
+.reveal.r4 .rv-tier .pill { color: #2a1d00; }
+.rv-name { margin: 6px 0 0; font-size: clamp(24px, 4vw, 36px); font-weight: 700; line-height: 1.15; text-wrap: balance; animation: rise .4s .3s both; }
+.rv-en { color: var(--ink-3); font-size: 13px; animation: rise .4s .35s both; overflow-wrap: anywhere; }
+.rv-specs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: min(640px, 100%); margin: 12px 0 2px; animation: rise .4s .4s both; }
+.rv-spec { background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .08); border-radius: 6px; padding: 7px 10px; text-align: left; min-width: 0; }
+.rv-spec .lab { font-size: 11.5px; color: var(--ink-3); }
+.rv-spec .val { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.wearbar { position: relative; width: min(640px, 100%); height: 6px; border-radius: 3px; margin: 10px 0 4px; animation: rise .4s .45s both;
+  background: linear-gradient(90deg, #3eaa59 0 7%, #8cc63f 7% 15%, #e7c43f 15% 38%, #e88b35 38% 45%, #d8473c 45% 100%); }
+.wearbar .out { position: absolute; top: 0; bottom: 0; background: rgba(8, 10, 14, .72); }
+.wearbar .ptr { position: absolute; top: -5px; width: 3px; height: 16px; margin-left: -1.5px; background: #fff; border-radius: 1px; box-shadow: 0 0 0 2px rgba(0, 0, 0, .5); }
+.wear-scale { position: relative; height: 16px; width: min(640px, 100%); font-size: 11px; color: var(--ink-3); animation: rise .4s .45s both; }
+.wear-scale span { position: absolute; top: 0; text-align: center; white-space: nowrap; overflow: visible; }
+.rv-flavor { margin: 8px 0 0; font-style: italic; color: var(--ink-2); font-size: 14px; animation: rise .4s .5s both; }
+.rv-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 14px; animation: rise .4s .55s both; }
+.rv-actions .btn-go, .rv-actions .btn-ghost { padding: 10px 24px; }
+.reveal.inspect .rv-kicker { visibility: hidden; }
+
+.batch-tiers { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 12px 0 16px; }
+.batch-tier { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; box-shadow: inset 0 -3px 0 var(--rc); }
+.batch-tier .lab { font-size: 12px; color: var(--ink-3); }
+.batch-tier .val { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.knife-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.knife-sec + .knife-sec { margin-top: 18px; }
+.knife-sec h3 { margin: 0 0 8px; font-size: 15px; }
+
+.tip { position: fixed; z-index: 80; pointer-events: none; background: #0f141a; border: 1px solid #3a4652; border-radius: 6px; padding: 7px 10px; font-size: 12.5px; color: var(--ink-2); box-shadow: 0 8px 24px rgba(0, 0, 0, .45); max-width: 260px; }
+.tip b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tip .tr { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tip .k { display: inline-block; width: 12px; height: 2px; }
+.toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 90; background: #1f2831; border: 1px solid #3a4652; color: var(--ink); border-radius: 8px; padding: 9px 14px; font-size: 13px; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+.footnote { color: var(--ink-3); font-size: 12px; text-align: center; margin: 4px 0 0; }
+
+@media (max-width: 1020px) {
+  .grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .cols, .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .mc-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .item-detail { grid-template-columns: minmax(0, 1fr) !important; }
+  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 8px; }
+  .contents, .stage-foot { padding-left: 12px; padding-right: 12px; }
+  .reel-wrap { --tile-w: 104px; --tile-h: 78px; }
+  .topbar .icon-btn { order: 1; }
+  .hud { width: 100%; order: 2; }
+  .hud-item { flex: 1 1 0; min-width: 0; padding: 3px 8px 4px; }
+  .hud-item b { font-size: 13px; }
+  .rv-specs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .batch-tiers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ratio-row, .ratio-axis { grid-template-columns: 96px minmax(0, 1fr) 100px; font-size: 12px; }
+  .tabpanel { padding: 14px 12px; }
+  .stage-foot { justify-content: center; }
+  .keyinfo { width: 100%; justify-content: center; }
+}
+@media (max-width: 520px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .case-model, .rv-rays, .rv-sway { animation: none !important; }
+}
+</style>
+
+<main class="app" id="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">CS2</span>
+      <div>
+        <span class="brand-name">梦魇武器箱 · 开箱模拟器</span>
+        <span class="brand-sub">Dreams &amp; Nightmares Case · 官方掉率与原版贴图 · 数据仅保存在本浏览器</span>
+      </div>
+    </div>
+    <div class="hud" aria-label="本次会话汇总">
+      <div class="hud-item"><span>已开箱</span><b id="hudN">0</b></div>
+      <div class="hud-item"><span>总花费</span><b id="hudCost">¥0.00</b></div>
+      <div class="hud-item"><span>出货价值</span><b id="hudVal">¥0.00</b></div>
+      <div class="hud-item"><span>盈亏</span><b id="hudNet">¥0.00</b></div>
+    </div>
+    <button class="icon-btn" id="soundBtn" type="button" aria-pressed="true" aria-label="音效">
+      <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+      <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></svg>
+    </button>
+  </header>
+
+  <section class="stage" id="stage" aria-label="解锁容器">
+    <div class="stage-bg" aria-hidden="true"></div>
+    <div class="stage-head">
+      <h1 class="stage-title">解锁容器</h1>
+      <p class="stage-sub">解锁 <b>梦魇武器箱</b></p>
+      <p class="stage-note"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="currentColor" opacity=".9"/><rect x="7.1" y="6.6" width="1.8" height="5.2" rx=".6" fill="#2b2b3b"/><circle cx="8" cy="4.6" r="1.1" fill="#2b2b3b"/></svg>此容器只能开启一次</p>
+    </div>
+    <div class="stage-center">
+      <div class="disc" aria-hidden="true"></div>
+      <div class="case-floor" aria-hidden="true"></div>
+      <img class="case-model" id="caseModel" src="img/case.webp" alt="梦魇武器箱" width="268" height="203">
+      <div class="reel-wrap" id="reelWrap" aria-hidden="true">
+        <div class="reel" id="reel"></div>
+        <div class="marker"></div>
+      </div>
+    </div>
+    <div class="contents" id="contents">
+      <div class="contents-head"><span>包含以下物品之一：</span><button class="link-btn" type="button" id="inspectAll">检视物品</button></div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <footer class="stage-foot">
+      <div class="keyinfo">
+        <img src="img/key.webp" alt="" width="235" height="198">
+        <div><span>使用 <b>梦魇武器箱钥匙</b></span><span class="cost" id="costLabel"></span></div>
+      </div>
+      <div class="actions" id="idleActions">
+        <label class="switch" for="skipToggle"><input type="checkbox" id="skipToggle">跳过动画</label>
+        <label class="qty" for="qtySel">数量
+          <select id="qtySel"><option value="1">1</option><option value="5">5</option><option value="10">10</option><option value="100">100</option><option value="1000">1000</option></select>
+        </label>
+        <button class="btn-go" type="button" id="openBtn">解锁容器</button>
+      </div>
+      <div class="actions" id="spinActions" hidden>
+        <span class="spinner" aria-hidden="true"></span>
+        <button class="btn-ghost" type="button" id="skipBtn">跳过动画</button>
+      </div>
+    </footer>
+    <p class="live" id="live" aria-live="polite"></p>
+  </section>
+
+  <section class="desk" aria-label="分析">
+    <div class="tabs" role="tablist" aria-label="分析视图">
+      <button class="tab" role="tab" type="button" id="tab-stats" aria-controls="panel-stats" aria-selected="true">统计分析</button>
+      <button class="tab" role="tab" type="button" id="tab-inv" aria-controls="panel-inv" aria-selected="false">库存<span class="count" id="invCount">0</span></button>
+      <button class="tab" role="tab" type="button" id="tab-odds" aria-controls="panel-odds" aria-selected="false">掉落概率</button>
+      <button class="tab" role="tab" type="button" id="tab-cost" aria-controls="panel-cost" aria-selected="false">成本设置</button>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-stats" aria-labelledby="tab-stats">
+      <div class="kpis" id="kpis"></div>
+      <div class="cols">
+        <div class="panel span-2">
+          <div class="panel-head">
+            <div><h3>每箱期望价值构成</h3><p class="desc" id="evDesc"></p></div>
+          </div>
+          <div class="stack" id="evStack" role="img" aria-label="各稀有度对期望价值的贡献"></div>
+          <div class="stack-labels" id="evStackLabels" aria-hidden="true"></div>
+          <div class="table-wrap"><table id="evTable"></table></div>
+        </div>
+        <div class="panel">
+          <h3>稀有度分布：实际与理论</h3>
+          <p class="desc">条形长度为“实际次数 ÷ 理论期望次数”，竖线处为 100%，即与官方概率完全一致。</p>
+          <div id="ratioBox"></div>
+        </div>
+        <div class="panel">
+          <h3>出金分析</h3>
+          <p class="desc">罕见特殊物品（★ 刀）的官方概率为 0.26%，每一箱独立判定，不存在“保底”。</p>
+          <div id="goldBox"></div>
+        </div>
+        <div class="panel span-2">
+          <div class="panel-head">
+            <div><h3>累计盈亏曲线</h3><p class="desc">每开一箱，累计“出货价值 − 开箱成本”。虚线为按期望价值计算的理论走势。</p></div>
+            <div class="legend" aria-hidden="true"><span><i class="key-line"></i>实际累计盈亏</span><span><i class="key-dash"></i>理论期望</span><span><i class="key-dot"></i>出金</span></div>
+          </div>
+          <div class="chart" id="plChart"></div>
+          <details class="table-view" id="plTableView"><summary>查看数据表</summary><div class="table-wrap" id="plTable"></div></details>
+        </div>
+        <div class="panel">
+          <h3>磨损与 StatTrak™</h3>
+          <p class="desc">理论值按你实际开出的每件物品各自的磨损区间计算。</p>
+          <div id="wearBox"></div>
+        </div>
+        <div class="panel">
+          <h3>最近出货</h3>
+          <p class="desc">点击可查看物品详情。</p>
+          <div class="recent" id="recentBox"></div>
+        </div>
+        <div class="panel span-2">
+          <div class="panel-head">
+            <div><h3>回报分布模拟</h3><p class="desc">模拟 2,000 位玩家各开 N 箱，看看开出价值 ÷ 成本的分布。价格与成本使用当前设置。</p></div>
+            <div class="mc-controls">
+              <div class="seg" role="group" aria-label="每人开箱数" id="mcSeg">
+                <button type="button" data-n="10" aria-pressed="false">10 箱</button>
+                <button type="button" data-n="100" aria-pressed="true">100 箱</button>
+                <button type="button" data-n="1000" aria-pressed="false">1000 箱</button>
+              </div>
+              <button class="btn-plain" type="button" id="mcRun">重新模拟</button>
+            </div>
+          </div>
+          <div class="mc-summary" id="mcSummary"></div>
+          <div class="legend" aria-hidden="true"><span><i class="key-bar"></i>玩家人数</span><span><i class="key-line" style="background:var(--ink)"></i>回本线 100%</span><span><i class="key-dash"></i>中位数</span></div>
+          <div class="chart" id="mcChart"></div>
+          <details class="table-view"><summary>查看数据表</summary><div class="table-wrap" id="mcTable"></div></details>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-inv" aria-labelledby="tab-inv" hidden>
+      <div class="toolbar">
+        <div class="chips" id="invChips" role="group" aria-label="按稀有度筛选"></div>
+        <select class="select" id="invSort" aria-label="排序">
+          <option value="new">最新获得</option>
+          <option value="value">价值最高</option>
+          <option value="rarity">稀有度最高</option>
+          <option value="float">磨损最低</option>
+        </select>
+        <label class="switch" for="invST"><input type="checkbox" id="invST">只看 StatTrak™</label>
+        <span class="inv-sum" id="invSum"></span>
+      </div>
+      <div class="inv-grid" id="invGrid"></div>
+      <div class="more" id="invMore"></div>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-odds" aria-labelledby="tab-odds" hidden>
+      <div class="panel">
+        <h3>档位概率</h3>
+        <p class="desc">Valve 对中国大陆公示的武器箱开启概率。先按档位判定，档位内各物品机会均等。</p>
+        <div class="table-wrap"><table id="tierTable"></table></div>
+      </div>
+      <div class="panel" style="margin-top:14px">
+        <div class="panel-head">
+          <div><h3>武器皮肤（17 件）</h3><p class="desc" id="weaponDesc"></p></div>
+          <label class="switch" for="oddsST"><input type="checkbox" id="oddsST">显示 StatTrak™ 价格</label>
+        </div>
+        <div class="table-wrap"><table class="odds-table" id="weaponTable"></table></div>
+      </div>
+      <div class="panel" style="margin-top:14px">
+        <h3>罕见特殊物品（5 种匕首 × 6 种伽玛涂装）</h3>
+        <p class="desc">与“激流大行动”武器箱相同的刀池。伽玛多普勒另分 P1–P4 与绿宝石五种相位。</p>
+        <div class="table-wrap"><table class="odds-table" id="knifeTable"></table></div>
+      </div>
+      <ul class="notes" id="oddsNotes"></ul>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-cost" aria-labelledby="tab-cost" hidden>
+      <div class="form-grid">
+        <div class="field">
+          <span class="lab">价格口径</span>
+          <label class="radio"><input type="radio" name="src" value="buff" id="srcBuff"><span><b>BUFF 在售最低价</b><br>国内主流交易平台的即时挂单价，更接近能变现的价格。</span></label>
+          <label class="radio"><input type="radio" name="src" value="steam" id="srcSteam"><span><b>Steam 社区市场 7 日均价</b><br>游戏内显示的价格，只能换成 Steam 钱包余额。</span></label>
+          <span class="hint" id="srcHint"></span>
+        </div>
+        <div class="field">
+          <span class="lab">单次开箱成本</span>
+          <label class="money" for="keyPrice">钥匙 ¥ <input type="number" id="keyPrice" min="0" step="0.01" inputmode="decimal"></label>
+          <label class="money" for="casePrice">武器箱 ¥ <input type="number" id="casePrice" min="0" step="0.01" inputmode="decimal"> <button class="btn-plain" type="button" id="caseReset">按口径默认</button></label>
+          <span class="hint">官方钥匙售价约 ¥17（$2.49）。如果箱子是每周掉落免费得到的，把武器箱价格改成 0。</span>
+        </div>
+        <div class="field">
+          <span class="lab">出货价值</span>
+          <label class="switch" for="feeToggle"><input type="checkbox" id="feeToggle">按出售到手价计算</label>
+          <span class="hint">开启后扣除出售手续费：BUFF 2.5%；Steam 社区市场约 13%（售价 ÷ 1.15）。</span>
+        </div>
+        <div class="field">
+          <span class="lab">开箱动画</span>
+          <label class="radio"><input type="radio" name="speed" value="normal" id="speedNormal"><span><b>原版节奏</b>（约 6 秒滚动）</span></label>
+          <label class="radio"><input type="radio" name="speed" value="fast" id="speedFast"><span><b>快速</b>（约 2.5 秒滚动）</span></label>
+          <label class="switch" for="skipToggle2"><input type="checkbox" id="skipToggle2">跳过动画，直接展示结果</label>
+        </div>
+        <div class="field">
+          <span class="lab">记录</span>
+          <span class="hint" id="dataHint"></span>
+          <div><button class="btn-danger" type="button" id="resetBtn">清空全部记录</button></div>
+        </div>
+        <div class="field">
+          <span class="lab">数据来源</span>
+          <span class="hint" id="sourceHint"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+  <p class="footnote">非官方模拟器，仅用于娱乐与概率学习，不涉及任何真实交易。物品贴图与名称来自 CS2 / Steam 社区市场，版权归 Valve 所有。</p>
+</main>
+
+<div class="overlay reveal" id="reveal" role="dialog" aria-modal="true" aria-labelledby="rvName" hidden>
+  <div class="ov-backdrop" data-close></div>
+  <div class="rv-rays" aria-hidden="true"></div>
+  <div class="rv-card">
+    <div class="rv-kicker">已 解 锁</div>
+    <div class="rv-img-wrap">
+      <div class="rv-glow" aria-hidden="true"></div>
+      <div class="rv-sway"><img id="rvImg" alt=""></div>
+      <div class="rv-sparks" id="rvSparks" aria-hidden="true"></div>
+    </div>
+    <div class="rv-tier"><span class="pill" id="rvTier"></span><span class="st-tag" id="rvST">StatTrak™</span></div>
+    <h2 class="rv-name" id="rvName"></h2>
+    <div class="rv-en" id="rvEn"></div>
+    <div class="rv-specs">
+      <div class="rv-spec"><div class="lab">外观</div><div class="val" id="rvWear"></div></div>
+      <div class="rv-spec"><div class="lab">磨损度</div><div class="val mono" id="rvFloat"></div></div>
+      <div class="rv-spec"><div class="lab">图案模板</div><div class="val num" id="rvSeed"></div></div>
+      <div class="rv-spec"><div class="lab" id="rvPriceLab">参考价</div><div class="val num" id="rvPrice"></div></div>
+    </div>
+    <div class="wearbar" id="rvWearbar" aria-hidden="true"></div>
+    <div class="wear-scale" aria-hidden="true"><span style="left:0;width:7%">崭新</span><span style="left:7%;width:8%">略磨</span><span style="left:15%;width:23%">久经沙场</span><span style="left:38%;width:7%">破损</span><span style="left:45%;width:55%">战痕累累</span></div>
+    <p class="rv-flavor" id="rvFlavor"></p>
+    <div class="rv-actions">
+      <button class="btn-ghost" type="button" id="rvClose">收下</button>
+      <button class="btn-go" type="button" id="rvAgain">再开一个</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
+  <div class="ov-backdrop" data-close></div>
+  <div class="modal-card">
+    <div class="modal-head"><h2 id="modalTitle"></h2><button class="close-x" type="button" data-close aria-label="关闭">×</button></div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<div class="tip" id="tip" role="tooltip" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<noscript><p style="text-align:center;color:#e8edf2">需要启用 JavaScript 才能开箱。</p></noscript>
+
+<script>
+(function () {
+  try {
+    var l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500&display=swap';
+    document.head.appendChild(l);
+  } catch (e) { /* fonts are optional */ }
+})();
+</script>
+<script>
+(() => {
+'use strict';
+const DATA = {"meta":{"priceDate":"2026-10-18","fx":6.7029,"caseZh":"梦魇武器箱","caseEn":"Dreams & Nightmares Case","keyZh":"梦魇武器箱钥匙","keyDescZh":"该钥匙只能打开梦魇武器箱","casePrice":{"steam":12.4,"buff":5.97},"stRatio":{"0":1.1470182116733842,"1":1.0700944799230165,"2":0.9475518463868557,"3":0.9848069327972835,"4":1.163322445170322},"globalBuffSteamRatio":0.613275984355993,"phaseWeight":{"p1":0.2375,"p2":0.2375,"p3":0.2375,"p4":0.2375,"emerald":0.05}},"items":[{"k":"fiveseven_scrawl","tier":0,"w":1,"wz":"FN57","sz":"涂鸦潦草","we":"Five-SeveN","se":"Scrawl","min":0,"max":1,"img":"img/w_fiveseven_scrawl.webp","fz":"空前绝后","fe":"The first and the last","mh":"Five-SeveN | Scrawl","wears":[0,1,2,3,4],"price":{"buff":[[3.28,6.03],[0.87,1.01],[0.34,0.47],[0.34,0.4],[0.34,0.47]],"steam":[[10.19,11.39],[1.74,2.08],[0.74,0.87],[0.67,0.74],[0.67,0.8]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"mac10_ensnared","tier":0,"w":1,"wz":"MAC-10","sz":"坐牢","we":"MAC-10","se":"Ensnared","min":0,"max":0.9,"img":"img/w_mac10_ensnared.webp","fz":"他们还没找到那个他们无法糊弄的人","fe":"They have yet to find someone they cannot fool","mh":"MAC-10 | Ensnared","wears":[0,1,2,3,4],"price":{"buff":[[3.15,4.56],[0.74,0.87],[0.34,0.4],[0.34,0.4],[0.34,0.47]],"steam":[[8.65,8.91],[1.54,1.68],[0.74,0.8],[0.6,0.74],[0.67,0.8]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"mag7_foresight","tier":0,"w":1,"wz":"MAG-7","sz":"先见之明","we":"MAG-7","se":"Foresight","min":0,"max":0.7,"img":"img/w_mag7_foresight.webp","fz":"对此，我已有良好的感觉……","fe":"I've got a good feeling about this...","mh":"MAG-7 | Foresight","wears":[0,1,2,3,4],"price":{"buff":[[1.27,1.61],[0.6,0.67],[0.34,0.34],[0.34,0.4],[0.34,0.47]],"steam":[[3.82,3.55],[1.27,1.41],[0.67,0.74],[0.6,0.74],[0.6,0.74]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"mp5sd_necrojr","tier":0,"w":1,"wz":"MP5-SD","sz":"小小噩梦","we":"MP5-SD","se":"Necro Jr.","min":0,"max":1,"img":"img/w_mp5sd_necrojr.webp","fz":"游戏时间结束！","fe":"Playtime is over!","mh":"MP5-SD | Necro Jr.","wears":[0,1,2,3,4],"price":{"buff":[[3.08,3.49],[0.87,0.8],[0.4,0.4],[0.34,0.4],[0.34,0.34]],"steam":[[8.24,8.18],[1.61,2.68],[0.8,0.8],[0.6,0.74],[0.6,0.8]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"p2000_liftedspirits","tier":0,"w":1,"wz":"P2000","sz":"升天","we":"P2000","se":"Lifted Spirits","min":0,"max":1,"img":"img/w_p2000_liftedspirits.webp","fz":"许多迷失的灵魂不希望被发现","fe":"Many lost souls do not wish to be found","mh":"P2000 | Lifted Spirits","wears":[0,1,2,3,4],"price":{"buff":[[3.02,3.28],[0.8,0.74],[0.34,0.4],[0.34,0.4],[0.34,0.47]],"steam":[[10.05,7.44],[1.68,1.81],[0.74,0.74],[0.67,0.67],[0.67,0.8]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"scar20_poultrygeist","tier":0,"w":1,"wz":"SCAR-20","sz":"暗夜活死鸡","we":"SCAR-20","se":"Poultrygeist","min":0,"max":0.57,"img":"img/w_scar20_poultrygeist.webp","fz":"小鸡乘着鲨鱼去战斗……","fe":"A chicken rides a shark into battle...","mh":"SCAR-20 | Poultrygeist","wears":[0,1,2,3,4],"price":{"buff":[[1.14,1.74],[0.67,0.67],[0.34,0.34],[0.34,0.47],[0.34,0.47]],"steam":[[3.49,3.42],[1.27,1.41],[0.67,0.74],[0.6,0.74],[0.54,0.8]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"sawedoff_spiritboard","tier":0,"w":1,"wz":"截短霰弹枪","sz":"灵应牌","we":"Sawed-Off","se":"Spirit Board","min":0,"max":1,"img":"img/w_sawedoff_spiritboard.webp","fz":"得了吧，我知道你在动它……","fe":"\\\"Come on, I know you're moving it...\\\"","mh":"Sawed-Off | Spirit Board","wears":[0,1,2,3,4],"price":{"buff":[[3.08,3.49],[0.8,0.8],[0.47,0.4],[0.34,0.34],[0.4,0.47]],"steam":[[8.31,7.31],[1.68,1.68],[0.74,0.8],[0.6,0.67],[0.6,0.74]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"ppbizon_spacecat","tier":1,"w":1,"wz":"PP-野牛","sz":"太空猫","we":"PP-Bizon","se":"Space Cat","min":0,"max":0.67,"img":"img/w_ppbizon_spacecat.webp","fz":"创造之爪","fe":"The paws of creation","mh":"PP-Bizon | Space Cat","wears":[0,1,2,3,4],"price":{"buff":[[7.84,9.72],[3.95,4.76],[3.35,3.02],[3.22,3.49],[3.28,3.02]],"steam":[[15.89,15.48],[6.77,7.04],[5.43,5.03],[4.96,4.96],[4.96,4.89]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"g3sg1_dreamglade","tier":1,"w":1,"wz":"G3SG1","sz":"梦之林地","we":"G3SG1","se":"Dream Glade","min":0,"max":1,"img":"img/w_g3sg1_dreamglade.webp","fz":"就在那儿，林中空地！","fe":"\\\"There, a clearing in the forest!\\\"","mh":"G3SG1 | Dream Glade","wears":[0,1,2,3,4],"price":{"buff":[[15.35,19.1],[4.89,4.96],[3.49,3.02],[3.35,2.95],[3.08,2.95]],"steam":[[38.68,28.76],[9.18,8.85],[5.9,5.5],[5.5,4.69],[4.96,4.83]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"m4a1s_nightterror","tier":1,"w":1,"wz":"M4A1消音版","sz":"夜无眠","we":"M4A1-S","se":"Night Terror","min":0,"max":0.7,"img":"img/w_m4a1s_nightterror.webp","fz":"在柔和夜色的笼罩下，正是我寻找光明的时候","fe":"In the bosom of the gentle night, is when I search for the light","mh":"M4A1-S | Night Terror","wears":[0,1,2,3,4],"price":{"buff":[[8.98,22.86],[4.69,9.92],[3.35,5.97],[3.42,10.72],[4.02,11.66]],"steam":[[24.06,41.83],[8.45,18.23],[5.9,10.72],[6.43,14.88],[6.57,19.51]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"xm1014_zombieoffensive","tier":1,"w":1,"wz":"XM1014","sz":"行尸攻势","we":"XM1014","se":"Zombie Offensive","min":0,"max":0.5,"img":"img/w_xm1014_zombieoffensive.webp","fz":"“亡灵游戏”","fe":"\\\"Undead game\\\"","mh":"XM1014 | Zombie Offensive","wears":[0,1,2,3,4],"price":{"buff":[[5.56,6.9],[3.55,3.75],[3.35,3.49],[3.08,3.22],[3.15,3.28]],"steam":[[13.2,12.53],[6.17,6.23],[5.3,4.96],[5.03,4.76],[4.96,5.03]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"usps_tickettohell","tier":1,"w":1,"wz":"USP消音版","sz":"地狱门票","we":"USP-S","se":"Ticket to Hell","min":0,"max":0.76,"img":"img/w_usps_tickettohell.webp","fz":"设计师之死","fe":"Designer death","mh":"USP-S | Ticket to Hell","wears":[0,1,2,3,4],"price":{"buff":[[9.92,27.41],[4.96,10.72],[3.28,3.82],[3.08,6.03],[3.08,3.42]],"steam":[[30.23,50.94],[9.05,19.24],[5.7,7.17],[5.63,8.91],[5.23,5.7]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"dualberettas_melondrama","tier":2,"w":1,"wz":"双持贝瑞塔","sz":"瓜瓜","we":"Dual Berettas","se":"Melondrama","min":0,"max":1,"img":"img/w_dualberettas_melondrama.webp","fz":"美梦……","fe":"Sweet dreams...","mh":"Dual Berettas | Melondrama","wears":[0,1,2,3,4],"price":{"buff":[[80.03,87.14],[40.42,42.7],[35.79,31.97],[34.86,31.77],[32.64,31.24]],"steam":[[179.64,195.32],[69.38,67.57],[57.98,52.15],[55.37,49.27],[51.55,49.8]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"famas_rapideyemovement","tier":2,"w":1,"wz":"法玛斯","sz":"目皆转睛","we":"FAMAS","se":"Rapid Eye Movement","min":0,"max":1,"img":"img/w_famas_rapideyemovement.webp","fz":"做梦的人由于眼睛过多，而陷入癫狂","fe":"Frantic are the eyes of the dreamer","mh":"FAMAS | Rapid Eye Movement","wears":[0,1,2,3,4],"price":{"buff":[[80.5,92.97],[40.42,43.64],[35.46,32.78],[34.86,31.77],[31.91,30.03]],"steam":[[225.55,204.17],[69.04,69.11],[57.78,53.02],[55.37,51.08],[51.14,49.27]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"mp7_abyssalapparition","tier":2,"w":1,"wz":"MP7","sz":"幽幻深渊","we":"MP7","se":"Abyssal Apparition","min":0,"max":1,"img":"img/w_mp7_abyssalapparition.webp","fz":"你无法逃避自己的命运","fe":"You cannot escape your destiny","mh":"MP7 | Abyssal Apparition","wears":[0,1,2,3,4],"price":{"buff":[[82.65,99.27],[41.36,42.09],[35.86,32.17],[34.79,31.24],[31.97,30.5]],"steam":[[185.47,168.11],[68.84,66.96],[57.85,51.88],[54.96,48.8],[50.88,48.73]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"ak47_nightwish","tier":3,"w":1,"wz":"AK-47","sz":"夜愿","we":"AK-47","se":"Nightwish","min":0,"max":1,"img":"img/w_ak47_nightwish.webp","fz":"我一直在为一个特殊的场合留着这个…… - 军火商布兹","fe":"I've been saving this for a special occasion... – Booth, Arms Dealer","mh":"AK-47 | Nightwish","wears":[0,1,2,3,4],"price":{"buff":[[662.98,774.79],[398.96,399.49],[354.99,330.92],[352.51,325.02],[335.01,329.45]],"steam":[[1106.18,1146.93],[672.9,703.6],[601.72,586.97],[572.23,552.59],[563.58,556.27]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"mp9_starlightprotector","tier":3,"w":1,"wz":"MP9","sz":"星使","we":"MP9","se":"Starlight Protector","min":0,"max":0.8,"img":"img/w_mp9_starlightprotector.webp","fz":"若神灵选择你，愿神灵保护你","fe":"May the deity protect you, should the deity select you","mh":"MP9 | Starlight Protector","wears":[0,1,2,3,4],"price":{"buff":[[565.99,509.89],[395.0,383.47],[357.0,347.01],[350.03,344.53],[336.02,336.02]],"steam":[[945.31,917.49],[679.47,672.97],[598.37,589.59],[585.3,590.99],[586.91,579.8]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"butterfly_gd_p1","tier":4,"w":0.2375,"knife":"butterfly","fin":"gd","wz":"蝴蝶刀","sz":"伽玛多普勒","we":"Butterfly Knife","se":"Gamma Doppler","ph":"p1","phz":"P1","phe":"Phase 1","min":0,"max":0.08,"img":"img/k_butterfly_gd_p1.webp","fz":"","fe":"","mh":"★ Butterfly Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[10499.96,10599.97],[12000.0,15999.49],[null,null],[null,null],[null,null]],"steam":[[12612.7,12239.26],[12871.95,11230.17],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"butterfly_gd_p2","tier":4,"w":0.2375,"knife":"butterfly","fin":"gd","wz":"蝴蝶刀","sz":"伽玛多普勒","we":"Butterfly Knife","se":"Gamma Doppler","ph":"p2","phz":"P2","phe":"Phase 2","min":0,"max":0.08,"img":"img/k_butterfly_gd_p2.webp","fz":"","fe":"","mh":"★ Butterfly Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[12999.4,13699.99],[13487.98,17456.5],[null,null],[null,null],[null,null]],"steam":[[15615.07,15818.7],[14468.05,12252.86],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"butterfly_gd_p3","tier":4,"w":0.2375,"knife":"butterfly","fin":"gd","wz":"蝴蝶刀","sz":"伽玛多普勒","we":"Butterfly Knife","se":"Gamma Doppler","ph":"p3","phz":"P3","phe":"Phase 3","min":0,"max":0.08,"img":"img/k_butterfly_gd_p3.webp","fz":"","fe":"","mh":"★ Butterfly Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[10167.96,10349.95],[10961.86,15999.49],[null,null],[null,null],[null,null]],"steam":[[12213.9,11950.57],[11758.37,11230.17],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"butterfly_gd_p4","tier":4,"w":0.2375,"knife":"butterfly","fin":"gd","wz":"蝴蝶刀","sz":"伽玛多普勒","we":"Butterfly Knife","se":"Gamma Doppler","ph":"p4","phz":"P4","phe":"Phase 4","min":0,"max":0.08,"img":"img/k_butterfly_gd_p4.webp","fz":"","fe":"","mh":"★ Butterfly Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[10100.0,9996.91],[11000.0,15499.99],[null,null],[null,null],[null,null]],"steam":[[12132.26,11542.93],[11799.28,10879.57],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"butterfly_gd_emerald","tier":4,"w":0.05,"knife":"butterfly","fin":"gd","wz":"蝴蝶刀","sz":"伽玛多普勒","we":"Butterfly Knife","se":"Gamma Doppler","ph":"emerald","phz":"绿宝石","phe":"Emerald","min":0,"max":0.08,"img":"img/k_butterfly_gd_emerald.webp","fz":"","fe":"","mh":"★ Butterfly Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[43899.91,40999.9],[47776.93,49998.87],[null,null],[null,null],[null,null]],"steam":[[52733.19,47340.55],[51248.52,35094.62],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"butterfly_lore","tier":4,"w":1.0,"knife":"butterfly","fin":"lore","wz":"蝴蝶刀","sz":"传说","we":"Butterfly Knife","se":"Lore","ph":null,"phz":null,"phe":null,"min":0,"max":1,"img":"img/k_butterfly_lore.webp","fz":"","fe":"","mh":"★ Butterfly Knife | Lore","wears":[0,1,2,3,4],"price":{"buff":[[11000.0,14199.49],[5399.52,5679.97],[3739.48,3900.02],[3239.98,4029.98],[2994.99,3199.96]],"steam":[[18339.52,23673.8],[9339.22,8800.24],[6420.98,6744.79],[5492.02,5635.06],[4912.62,5164.99]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[true,true],[false,false],[false,false],[false,false],[false,false]]}},{"k":"butterfly_autotronic","tier":4,"w":1.0,"knife":"butterfly","fin":"autotronic","wz":"蝴蝶刀","sz":"自动化","we":"Butterfly Knife","se":"Autotronic","ph":null,"phz":null,"phe":null,"min":0,"max":0.85,"img":"img/k_butterfly_autotronic.webp","fz":"","fe":"","mh":"★ Butterfly Knife | Autotronic","wears":[0,1,2,3,4],"price":{"buff":[[8091.74,8699.96],[5800.02,5581.91],[4742.97,4540.01],[4343.88,4399.98],[3800.01,4399.18]],"steam":[[12065.22,14518.16],[9678.85,9408.79],[8058.7,8237.6],[7046.56,7125.32],[6420.04,5679.84]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,true],[false,false],[false,false],[false,false],[false,false]]}},{"k":"butterfly_blacklaminate","tier":4,"w":1.0,"knife":"butterfly","fin":"blacklaminate","wz":"蝴蝶刀","sz":"黑色层压板","we":"Butterfly Knife","se":"Black Laminate","ph":null,"phz":null,"phe":null,"min":0,"max":1,"img":"img/k_butterfly_blacklaminate.webp","fz":"","fe":"","mh":"★ Butterfly Knife | Black Laminate","wears":[0,1,2,3,4],"price":{"buff":[[4945.0,8797.96],[3800.01,3999.49],[3659.98,3580.02],[3399.98,3409.97],[3285.49,3339.99]],"steam":[[7839.58,14677.83],[6462.67,6224.31],[6196.83,6248.44],[5672.26,5811.21],[5445.5,5446.58]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,true],[false,false],[false,false],[false,false],[false,false]]}},{"k":"butterfly_brightwater","tier":4,"w":1.0,"knife":"butterfly","fin":"brightwater","wz":"蝴蝶刀","sz":"澄澈之水","we":"Butterfly Knife","se":"Bright Water","ph":null,"phz":null,"phe":null,"min":0,"max":0.5,"img":"img/k_butterfly_brightwater.webp","fz":"我们的世界充满了阴谋暗算… 但有时用作伪装的迷彩就是拿来炫的 - 军火商布兹","fe":"Ours is a world of intrigue...but sometimes camouflage is meant to be seen - Booth, Arms Dealer","mh":"★ Butterfly Knife | Bright Water","wears":[0,1,2,3,4],"price":{"buff":[[3582.97,4065.98],[3165.98,3445.02],[2999.01,3111.02],[2969.99,3598.99],[2990.9,2960.0]],"steam":[[5908.74,6530.23],[5392.35,5394.56],[5105.13,4848.07],[4960.21,4266.06],[4797.13,4753.95]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,true]]}},{"k":"butterfly_freehand","tier":4,"w":1.0,"knife":"butterfly","fin":"freehand","wz":"蝴蝶刀","sz":"自由之手","we":"Butterfly Knife","se":"Freehand","ph":null,"phz":null,"phe":null,"min":0,"max":0.48,"img":"img/k_butterfly_freehand.webp","fz":"","fe":"","mh":"★ Butterfly Knife | Freehand","wears":[0,1,2,3,4],"price":{"buff":[[4009.47,4699.47],[3549.99,3988.02],[3299.5,3399.98],[3246.42,4089.98],[3487.99,4999.96]],"steam":[[7022.49,6460.46],[5948.62,6367.75],[5690.56,5696.86],[5447.78,6853.23],[4865.37,8378.01]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,true],[false,true]]}},{"k":"huntsman_gd_p1","tier":4,"w":0.2375,"knife":"huntsman","fin":"gd","wz":"猎杀者匕首","sz":"伽玛多普勒","we":"Huntsman Knife","se":"Gamma Doppler","ph":"p1","phz":"P1","phe":"Phase 1","min":0,"max":0.08,"img":"img/k_huntsman_gd_p1.webp","fz":"","fe":"","mh":"★ Huntsman Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1189.97,1449.5],[1599.92,1740.01],[null,null],[null,null],[null,null]],"steam":[[2103.41,2274.63],[2452.56,1823.08],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"huntsman_gd_p2","tier":4,"w":0.2375,"knife":"huntsman","fin":"gd","wz":"猎杀者匕首","sz":"伽玛多普勒","we":"Huntsman Knife","se":"Gamma Doppler","ph":"p2","phz":"P2","phe":"Phase 2","min":0,"max":0.08,"img":"img/k_huntsman_gd_p2.webp","fz":"","fe":"","mh":"★ Huntsman Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1370.01,1439.51],[2399.97,1655.44],[null,null],[null,null],[null,null]],"steam":[[2421.65,2258.96],[3678.99,3142.19],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,true],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"huntsman_gd_p3","tier":4,"w":0.2375,"knife":"huntsman","fin":"gd","wz":"猎杀者匕首","sz":"伽玛多普勒","we":"Huntsman Knife","se":"Gamma Doppler","ph":"p3","phz":"P3","phe":"Phase 3","min":0,"max":0.08,"img":"img/k_huntsman_gd_p3.webp","fz":"","fe":"","mh":"★ Huntsman Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1225.02,1596.97],[1599.98,2789.48],[null,null],[null,null],[null,null]],"steam":[[2165.37,2506.04],[2452.66,2922.65],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"huntsman_gd_p4","tier":4,"w":0.2375,"knife":"huntsman","fin":"gd","wz":"猎杀者匕首","sz":"伽玛多普勒","we":"Huntsman Knife","se":"Gamma Doppler","ph":"p4","phz":"P4","phe":"Phase 4","min":0,"max":0.08,"img":"img/k_huntsman_gd_p4.webp","fz":"","fe":"","mh":"★ Huntsman Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1225.02,1480.0],[1599.98,1702.0],[null,null],[null,null],[null,null]],"steam":[[2165.37,2322.49],[2452.66,2923.21],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,true],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"huntsman_gd_emerald","tier":4,"w":0.05,"knife":"huntsman","fin":"gd","wz":"猎杀者匕首","sz":"伽玛多普勒","we":"Huntsman Knife","se":"Gamma Doppler","ph":"emerald","phz":"绿宝石","phe":"Emerald","min":0,"max":0.08,"img":"img/k_huntsman_gd_emerald.webp","fz":"","fe":"","mh":"★ Huntsman Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[3465.47,3947.0],[3985.29,4539.05],[null,null],[null,null],[null,null]],"steam":[[6125.62,6193.83],[7044.46,7122.9],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[true,true],[false,false],[false,false],[false,false]],"steam":[[false,false],[true,true],[false,false],[false,false],[false,false]]}},{"k":"huntsman_lore","tier":4,"w":1.0,"knife":"huntsman","fin":"lore","wz":"猎杀者匕首","sz":"传说","we":"Huntsman Knife","se":"Lore","ph":null,"phz":null,"phe":null,"min":0,"max":0.65,"img":"img/k_huntsman_lore.webp","fz":"","fe":"","mh":"★ Huntsman Knife | Lore","wears":[0,1,2,3,4],"price":{"buff":[[779.88,1464.99],[648.51,864.2],[536.97,589.52],[665.33,549.97],[558.42,530.0]],"steam":[[1385.42,1538.52],[1084.13,1222.94],[882.84,968.5],[752.13,971.79],[734.44,753.34]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"huntsman_autotronic","tier":4,"w":1.0,"knife":"huntsman","fin":"autotronic","wz":"猎杀者匕首","sz":"自动化","we":"Huntsman Knife","se":"Autotronic","ph":null,"phz":null,"phe":null,"min":0,"max":0.85,"img":"img/k_huntsman_autotronic.webp","fz":"","fe":"","mh":"★ Huntsman Knife | Autotronic","wears":[0,1,2,3,4],"price":{"buff":[[990.02,1458.01],[689.53,849.93],[567.94,690.0],[598.9,623.66],[517.93,769.02]],"steam":[[1739.07,1547.57],[1159.4,1254.85],[947.25,978.76],[836.72,920.78],[858.51,870.77]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,true],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"huntsman_blacklaminate","tier":4,"w":1.0,"knife":"huntsman","fin":"blacklaminate","wz":"猎杀者匕首","sz":"黑色层压板","we":"Huntsman Knife","se":"Black Laminate","ph":null,"phz":null,"phe":null,"min":0,"max":1,"img":"img/k_huntsman_blacklaminate.webp","fz":"","fe":"","mh":"★ Huntsman Knife | Black Laminate","wears":[0,1,2,3,4],"price":{"buff":[[714.53,831.23],[397.01,509.29],[359.01,463.51],[344.93,363.12],[345.53,489.98]],"steam":[[787.66,916.3],[688.52,869.37],[626.79,652.33],[587.38,573.77],[584.96,725.86]]},"est":{"buff":[[false,true],[false,false],[false,false],[false,true],[false,false]],"steam":[[false,true],[false,false],[false,false],[false,false],[false,false]]}},{"k":"huntsman_brightwater","tier":4,"w":1.0,"knife":"huntsman","fin":"brightwater","wz":"猎杀者匕首","sz":"澄澈之水","we":"Huntsman Knife","se":"Bright Water","ph":null,"phz":null,"phe":null,"min":0,"max":0.5,"img":"img/k_huntsman_brightwater.webp","fz":"我们的世界充满了阴谋暗算… 但有时用作伪装的迷彩就是拿来炫的 - 军火商布兹","fe":"Ours is a world of intrigue...but sometimes camouflage is meant to be seen - Booth, Arms Dealer","mh":"★ Huntsman Knife | Bright Water","wears":[0,1,2,3,4],"price":{"buff":[[400.03,530.0],[350.03,460.02],[316.91,419.13],[443.4,425.1],[399.02,464.19]],"steam":[[715.53,704.74],[619.68,625.45],[540.25,564.18],[515.86,546.89],[546.69,570.15]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,true]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"huntsman_freehand","tier":4,"w":1.0,"knife":"huntsman","fin":"freehand","wz":"猎杀者匕首","sz":"自由之手","we":"Huntsman Knife","se":"Freehand","ph":null,"phz":null,"phe":null,"min":0,"max":0.48,"img":"img/k_huntsman_freehand.webp","fz":"","fe":"","mh":"★ Huntsman Knife | Freehand","wears":[0,1,2,3,4],"price":{"buff":[[484.22,808.91],[422.22,530.0],[360.01,449.5],[420.0,488.6],[449.97,789.14]],"steam":[[818.49,906.57],[739.4,777.0],[637.31,694.42],[591.46,591.46],[636.78,1219.12]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,true],[false,true]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"bowie_gd_p1","tier":4,"w":0.2375,"knife":"bowie","fin":"gd","wz":"鲍伊猎刀","sz":"伽玛多普勒","we":"Bowie Knife","se":"Gamma Doppler","ph":"p1","phz":"P1","phe":"Phase 1","min":0,"max":0.08,"img":"img/k_bowie_gd_p1.webp","fz":"","fe":"","mh":"★ Bowie Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1009.99,1387.5],[1699.99,2200.03],[null,null],[null,null],[null,null]],"steam":[[1913.13,2146.33],[2476.93,2959.89],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"bowie_gd_p2","tier":4,"w":0.2375,"knife":"bowie","fin":"gd","wz":"鲍伊猎刀","sz":"伽玛多普勒","we":"Bowie Knife","se":"Gamma Doppler","ph":"p2","phz":"P2","phe":"Phase 2","min":0,"max":0.08,"img":"img/k_bowie_gd_p2.webp","fz":"","fe":"","mh":"★ Bowie Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1090.03,1279.99],[1566.0,1471.99],[null,null],[null,null],[null,null]],"steam":[[2064.73,1980.01],[2281.7,2277.01],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,true],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,true],[false,false],[false,false],[false,false]]}},{"k":"bowie_gd_p3","tier":4,"w":0.2375,"knife":"bowie","fin":"gd","wz":"鲍伊猎刀","sz":"伽玛多普勒","we":"Bowie Knife","se":"Gamma Doppler","ph":"p3","phz":"P3","phe":"Phase 3","min":0,"max":0.08,"img":"img/k_bowie_gd_p3.webp","fz":"","fe":"","mh":"★ Bowie Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1016.03,1320.0],[1250.02,1454.18],[null,null],[null,null],[null,null]],"steam":[[1924.56,2041.91],[1821.31,3592.14],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,true],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"bowie_gd_p4","tier":4,"w":0.2375,"knife":"bowie","fin":"gd","wz":"鲍伊猎刀","sz":"伽玛多普勒","we":"Bowie Knife","se":"Gamma Doppler","ph":"p4","phz":"P4","phe":"Phase 4","min":0,"max":0.08,"img":"img/k_bowie_gd_p4.webp","fz":"","fe":"","mh":"★ Bowie Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1038.01,1511.97],[1565.86,2690.01],[null,null],[null,null],[null,null]],"steam":[[1966.21,2338.87],[2281.5,3619.11],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"bowie_gd_emerald","tier":4,"w":0.05,"knife":"bowie","fin":"gd","wz":"鲍伊猎刀","sz":"伽玛多普勒","we":"Bowie Knife","se":"Gamma Doppler","ph":"emerald","phz":"绿宝石","phe":"Emerald","min":0,"max":0.08,"img":"img/k_bowie_gd_emerald.webp","fz":"","fe":"","mh":"★ Bowie Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[2659.98,3499.99],[4099.96,4769.58],[null,null],[null,null],[null,null]],"steam":[[5038.54,5414.13],[5973.75,6949.4],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,true],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,true],[false,false],[false,false],[false,false]]}},{"k":"bowie_lore","tier":4,"w":1.0,"knife":"bowie","fin":"lore","wz":"鲍伊猎刀","sz":"传说","we":"Bowie Knife","se":"Lore","ph":null,"phz":null,"phe":null,"min":0,"max":1,"img":"img/k_bowie_lore.webp","fz":"","fe":"","mh":"★ Bowie Knife | Lore","wears":[0,1,2,3,4],"price":{"buff":[[999.0,1769.97],[580.0,950.0],[464.98,604.47],[449.97,549.84],[429.99,599.98]],"steam":[[1588.79,2197.21],[1052.96,938.47],[840.14,897.38],[772.64,844.36],[734.77,753.41]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,true],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"bowie_autotronic","tier":4,"w":1.0,"knife":"bowie","fin":"autotronic","wz":"鲍伊猎刀","sz":"自动化","we":"Bowie Knife","se":"Autotronic","ph":null,"phz":null,"phe":null,"min":0,"max":0.85,"img":"img/k_bowie_autotronic.webp","fz":"","fe":"","mh":"★ Bowie Knife | Autotronic","wears":[0,1,2,3,4],"price":{"buff":[[880.02,1649.99],[545.01,736.51],[445.88,549.97],[479.99,479.99],[439.98,598.97]],"steam":[[1300.63,2103.03],[1001.15,1077.49],[814.94,911.39],[767.55,874.73],[737.59,822.58]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"bowie_blacklaminate","tier":4,"w":1.0,"knife":"bowie","fin":"blacklaminate","wz":"鲍伊猎刀","sz":"黑色层压板","we":"Bowie Knife","se":"Black Laminate","ph":null,"phz":null,"phe":null,"min":0,"max":1,"img":"img/k_bowie_blacklaminate.webp","fz":"","fe":"","mh":"★ Bowie Knife | Black Laminate","wears":[0,1,2,3,4],"price":{"buff":[[505.93,588.56],[337.02,449.03],[291.98,359.01],[289.97,498.49],[288.83,449.97]],"steam":[[844.03,1397.89],[578.73,701.53],[519.88,571.22],[496.42,548.16],[493.94,523.7]]},"est":{"buff":[[false,true],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"bowie_brightwater","tier":4,"w":1.0,"knife":"bowie","fin":"brightwater","wz":"鲍伊猎刀","sz":"澄澈之水","we":"Bowie Knife","se":"Bright Water","ph":null,"phz":null,"phe":null,"min":0,"max":0.5,"img":"img/k_bowie_brightwater.webp","fz":"我们的世界充满了阴谋暗算… 但有时用作伪装的迷彩就是拿来炫的 - 军火商布兹","fe":"Ours is a world of intrigue...but sometimes camouflage is meant to be seen - Booth, Arms Dealer","mh":"★ Bowie Knife | Bright Water","wears":[0,1,2,3,4],"price":{"buff":[[350.03,487.9],[320.0,449.97],[300.02,349.02],[321.0,373.43],[449.97,523.46]],"steam":[[592.54,795.5],[544.74,638.99],[503.05,530.07],[478.05,492.26],[503.72,585.99]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,true],[false,true]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,true]]}},{"k":"bowie_freehand","tier":4,"w":1.0,"knife":"bowie","fin":"freehand","wz":"鲍伊猎刀","sz":"自由之手","we":"Bowie Knife","se":"Freehand","ph":null,"phz":null,"phe":null,"min":0,"max":0.48,"img":"img/k_bowie_freehand.webp","fz":"","fe":"","mh":"★ Bowie Knife | Freehand","wears":[0,1,2,3,4],"price":{"buff":[[429.52,720.96],[374.96,587.24],[350.49,499.03],[419.87,422.01],[434.88,577.96]],"steam":[[772.17,744.09],[697.57,866.08],[626.86,674.24],[630.01,674.18],[591.06,867.22]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,true]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_gd_p1","tier":4,"w":0.2375,"knife":"falchion","fin":"gd","wz":"弯刀","sz":"伽玛多普勒","we":"Falchion Knife","se":"Gamma Doppler","ph":"p1","phz":"P1","phe":"Phase 1","min":0,"max":0.08,"img":"img/k_falchion_gd_p1.webp","fz":"","fe":"","mh":"★ Falchion Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1276.97,1600.99],[2000.01,2799.0],[null,null],[null,null],[null,null]],"steam":[[2166.27,2302.99],[2307.74,3167.27],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_gd_p2","tier":4,"w":0.2375,"knife":"falchion","fin":"gd","wz":"弯刀","sz":"伽玛多普勒","we":"Falchion Knife","se":"Gamma Doppler","ph":"p2","phz":"P2","phe":"Phase 2","min":0,"max":0.08,"img":"img/k_falchion_gd_p2.webp","fz":"","fe":"","mh":"★ Falchion Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1320.0,1749.99],[2299.97,2797.99],[null,null],[null,null],[null,null]],"steam":[[2239.27,2517.33],[2653.85,3166.14],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_gd_p3","tier":4,"w":0.2375,"knife":"falchion","fin":"gd","wz":"弯刀","sz":"伽玛多普勒","we":"Falchion Knife","se":"Gamma Doppler","ph":"p3","phz":"P3","phe":"Phase 3","min":0,"max":0.08,"img":"img/k_falchion_gd_p3.webp","fz":"","fe":"","mh":"★ Falchion Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1232.53,1668.08],[1417.41,1790.01],[null,null],[null,null],[null,null]],"steam":[[2090.88,2399.5],[2604.81,2025.53],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[true,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_gd_p4","tier":4,"w":0.2375,"knife":"falchion","fin":"gd","wz":"弯刀","sz":"伽玛多普勒","we":"Falchion Knife","se":"Gamma Doppler","ph":"p4","phz":"P4","phe":"Phase 4","min":0,"max":0.08,"img":"img/k_falchion_gd_p4.webp","fz":"","fe":"","mh":"★ Falchion Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[1212.55,1547.97],[2000.01,1790.01],[null,null],[null,null],[null,null]],"steam":[[2056.99,2226.72],[2307.74,2025.53],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_gd_emerald","tier":4,"w":0.05,"knife":"falchion","fin":"gd","wz":"弯刀","sz":"伽玛多普勒","we":"Falchion Knife","se":"Gamma Doppler","ph":"emerald","phz":"绿宝石","phe":"Emerald","min":0,"max":0.08,"img":"img/k_falchion_gd_emerald.webp","fz":"","fe":"","mh":"★ Falchion Knife | Gamma Doppler","wears":[0,1],"price":{"buff":[[3000.02,3583.37],[4316.0,4120.88],[null,null],[null,null],[null,null]],"steam":[[5089.27,5154.6],[4980.08,7920.99],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,true],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_lore","tier":4,"w":1.0,"knife":"falchion","fin":"lore","wz":"弯刀","sz":"传说","we":"Falchion Knife","se":"Lore","ph":null,"phz":null,"phe":null,"min":0,"max":0.65,"img":"img/k_falchion_lore.webp","fz":"","fe":"","mh":"★ Falchion Knife | Lore","wears":[0,1,2,3,4],"price":{"buff":[[896.51,1199.89],[699.98,918.97],[520.01,786.99],[633.49,871.65],[577.52,630.92]],"steam":[[1455.2,1611.65],[1150.95,1279.92],[941.56,1020.25],[907.91,915.35],[822.11,898.12]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,true]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_autotronic","tier":4,"w":1.0,"knife":"falchion","fin":"autotronic","wz":"弯刀","sz":"自动化","we":"Falchion Knife","se":"Autotronic","ph":null,"phz":null,"phe":null,"min":0,"max":0.85,"img":"img/k_falchion_autotronic.webp","fz":"","fe":"","mh":"★ Falchion Knife | Autotronic","wears":[0,1,2,3,4],"price":{"buff":[[999.0,1399.97],[693.01,819.5],[530.0,694.89],[599.98,571.34],[530.0,999.87]],"steam":[[1595.22,2688.87],[1116.5,1241.71],[959.32,1001.95],[892.89,912.33],[868.36,937.53]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,true],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_blacklaminate","tier":4,"w":1.0,"knife":"falchion","fin":"blacklaminate","wz":"弯刀","sz":"黑色层压板","we":"Falchion Knife","se":"Black Laminate","ph":null,"phz":null,"phe":null,"min":0,"max":1,"img":"img/k_falchion_blacklaminate.webp","fz":"","fe":"","mh":"★ Falchion Knife | Black Laminate","wears":[0,1,2,3,4],"price":{"buff":[[620.02,1100.01],[388.03,510.02],[362.49,479.93],[350.76,363.03],[347.14,439.98]],"steam":[[1106.05,1618.82],[683.63,831.83],[614.39,619.55],[602.66,622.1],[585.16,575.58]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_brightwater","tier":4,"w":1.0,"knife":"falchion","fin":"brightwater","wz":"弯刀","sz":"澄澈之水","we":"Falchion Knife","se":"Bright Water","ph":null,"phz":null,"phe":null,"min":0,"max":0.5,"img":"img/k_falchion_brightwater.webp","fz":"我们的世界充满了阴谋暗算… 但有时用作伪装的迷彩就是拿来炫的 - 军火商布兹","fe":"Ours is a world of intrigue...but sometimes camouflage is meant to be seen - Booth, Arms Dealer","mh":"★ Falchion Knife | Bright Water","wears":[0,1,2,3,4],"price":{"buff":[[449.5,587.91],[394.0,499.97],[387.03,457.0],[396.01,460.69],[400.03,428.04]],"steam":[[772.44,958.98],[703.74,773.38],[634.03,640.33],[614.45,599.31],[644.48,693.88]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,true],[false,true]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"falchion_freehand","tier":4,"w":1.0,"knife":"falchion","fin":"freehand","wz":"弯刀","sz":"自由之手","we":"Falchion Knife","se":"Freehand","ph":null,"phz":null,"phe":null,"min":0,"max":0.48,"img":"img/k_falchion_freehand.webp","fz":"","fe":"","mh":"★ Falchion Knife | Freehand","wears":[0,1,2,3,4],"price":{"buff":[[548.5,709.97],[470.01,690.0],[435.02,599.98],[499.03,571.98],[439.98,532.74]],"steam":[[953.62,926.01],[855.56,932.84],[763.46,806.02],[669.02,770.83],[558.55,717.95]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,true],[false,true]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"daggers_gd_p1","tier":4,"w":0.2375,"knife":"daggers","fin":"gd","wz":"暗影双匕","sz":"伽玛多普勒","we":"Shadow Daggers","se":"Gamma Doppler","ph":"p1","phz":"P1","phe":"Phase 1","min":0,"max":0.08,"img":"img/k_daggers_gd_p1.webp","fz":"","fe":"","mh":"★ Shadow Daggers | Gamma Doppler","wears":[0,1],"price":{"buff":[[576.85,724.99],[887.53,791.01],[null,null],[null,null],[null,null]],"steam":[[969.06,1147.41],[1135.89,1435.56],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"daggers_gd_p2","tier":4,"w":0.2375,"knife":"daggers","fin":"gd","wz":"暗影双匕","sz":"伽玛多普勒","we":"Shadow Daggers","se":"Gamma Doppler","ph":"p2","phz":"P2","phe":"Phase 2","min":0,"max":0.08,"img":"img/k_daggers_gd_p2.webp","fz":"","fe":"","mh":"★ Shadow Daggers | Gamma Doppler","wears":[0,1],"price":{"buff":[[589.92,666.0],[1000.01,1163.33],[null,null],[null,null],[null,null]],"steam":[[991.01,1054.06],[1279.84,1488.87],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,true],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,true],[false,false],[false,false],[false,false]]}},{"k":"daggers_gd_p3","tier":4,"w":0.2375,"knife":"daggers","fin":"gd","wz":"暗影双匕","sz":"伽玛多普勒","we":"Shadow Daggers","se":"Gamma Doppler","ph":"p3","phz":"P3","phe":"Phase 3","min":0,"max":0.08,"img":"img/k_daggers_gd_p3.webp","fz":"","fe":"","mh":"★ Shadow Daggers | Gamma Doppler","wears":[0,1],"price":{"buff":[[569.01,690.0],[900.0,791.01],[null,null],[null,null],[null,null]],"steam":[[955.88,1092.03],[1151.84,1435.56],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"daggers_gd_p4","tier":4,"w":0.2375,"knife":"daggers","fin":"gd","wz":"暗影双匕","sz":"伽玛多普勒","we":"Shadow Daggers","se":"Gamma Doppler","ph":"p4","phz":"P4","phe":"Phase 4","min":0,"max":0.08,"img":"img/k_daggers_gd_p4.webp","fz":"","fe":"","mh":"★ Shadow Daggers | Gamma Doppler","wears":[0,1],"price":{"buff":[[561.57,698.98],[645.81,791.01],[null,null],[null,null],[null,null]],"steam":[[943.38,1106.25],[1432.1,1435.56],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[true,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"daggers_gd_emerald","tier":4,"w":0.05,"knife":"daggers","fin":"gd","wz":"暗影双匕","sz":"伽玛多普勒","we":"Shadow Daggers","se":"Gamma Doppler","ph":"emerald","phz":"绿宝石","phe":"Emerald","min":0,"max":0.08,"img":"img/k_daggers_gd_emerald.webp","fz":"","fe":"","mh":"★ Shadow Daggers | Gamma Doppler","wears":[0,1],"price":{"buff":[[1150.02,1715.0],[2000.01,3000.02],[null,null],[null,null],[null,null]],"steam":[[1931.92,2714.28],[2559.67,2977.72],[null,null],[null,null],[null,null]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,true],[false,false],[false,false],[false,false]]}},{"k":"daggers_lore","tier":4,"w":1.0,"knife":"daggers","fin":"lore","wz":"暗影双匕","sz":"传说","we":"Shadow Daggers","se":"Lore","ph":null,"phz":null,"phe":null,"min":0,"max":1,"img":"img/k_daggers_lore.webp","fz":"","fe":"","mh":"★ Shadow Daggers | Lore","wears":[0,1,2,3,4],"price":{"buff":[[680.01,791.07],[365.98,508.01],[300.02,449.97],[288.56,420.0],[285.95,449.97]],"steam":[[1157.12,1657.29],[652.46,819.56],[536.1,580.14],[514.25,606.61],[494.81,557.95]]},"est":{"buff":[[false,true],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"daggers_autotronic","tier":4,"w":1.0,"knife":"daggers","fin":"autotronic","wz":"暗影双匕","sz":"自动化","we":"Shadow Daggers","se":"Autotronic","ph":null,"phz":null,"phe":null,"min":0,"max":0.85,"img":"img/k_daggers_autotronic.webp","fz":"","fe":"","mh":"★ Shadow Daggers | Autotronic","wears":[0,1,2,3,4],"price":{"buff":[[522.89,795.03],[314.43,410.02],[269.12,329.51],[310.01,449.5],[265.03,448.02]],"steam":[[775.93,1132.99],[522.02,621.43],[439.44,540.39],[455.73,540.19],[443.33,455.19]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"daggers_blacklaminate","tier":4,"w":1.0,"knife":"daggers","fin":"blacklaminate","wz":"暗影双匕","sz":"黑色层压板","we":"Shadow Daggers","se":"Black Laminate","ph":null,"phz":null,"phe":null,"min":0,"max":1,"img":"img/k_daggers_blacklaminate.webp","fz":"","fe":"","mh":"★ Shadow Daggers | Black Laminate","wears":[0,1,2,3,4],"price":{"buff":[[400.03,699.98],[254.98,300.02],[228.03,268.92],[219.99,397.01],[219.72,335.01]],"steam":[[463.04,538.66],[397.95,420.61],[364.37,401.84],[358.07,397.82],[357.33,374.63]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,false]],"steam":[[false,true],[false,false],[false,false],[false,false],[false,false]]}},{"k":"daggers_brightwater","tier":4,"w":1.0,"knife":"daggers","fin":"brightwater","wz":"暗影双匕","sz":"澄澈之水","we":"Shadow Daggers","se":"Bright Water","ph":null,"phz":null,"phe":null,"min":0,"max":0.5,"img":"img/k_daggers_brightwater.webp","fz":"我们的世界充满了阴谋暗算… 但有时用作伪装的迷彩就是拿来炫的 - 军火商布兹","fe":"Ours is a world of intrigue...but sometimes camouflage is meant to be seen - Booth, Arms Dealer","mh":"★ Shadow Daggers | Bright Water","wears":[0,1,2,3,4],"price":{"buff":[[269.99,392.99],[235.0,299.02],[222.0,258.93],[259.87,269.26],[268.99,329.05]],"steam":[[404.92,546.29],[368.99,412.03],[357.67,380.99],[346.81,374.29],[353.51,457.41]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,true],[false,true]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}},{"k":"daggers_freehand","tier":4,"w":1.0,"knife":"daggers","fin":"freehand","wz":"暗影双匕","sz":"自由之手","we":"Shadow Daggers","se":"Freehand","ph":null,"phz":null,"phe":null,"min":0,"max":0.48,"img":"img/k_daggers_freehand.webp","fz":"","fe":"","mh":"★ Shadow Daggers | Freehand","wears":[0,1,2,3,4],"price":{"buff":[[325.89,476.91],[294.99,489.98],[260.01,350.03],[298.01,400.03],[350.03,322.46]],"steam":[[534.76,725.39],[478.79,574.64],[457.14,510.96],[442.73,494.41],[471.48,479.06]]},"est":{"buff":[[false,false],[false,false],[false,false],[false,false],[false,true]],"steam":[[false,false],[false,false],[false,false],[false,false],[false,false]]}}]};
+
+/* ================= constants & data ================= */
+const TIERS = [
+  { id: 0, zh: '军规级', short: '军规', en: 'Mil-Spec', p: 0.7992 },
+  { id: 1, zh: '受限级', short: '受限', en: 'Restricted', p: 0.1598 },
+  { id: 2, zh: '保密级', short: '保密', en: 'Classified', p: 0.0320 },
+  { id: 3, zh: '隐秘级', short: '隐秘', en: 'Covert', p: 0.0064 },
+  { id: 4, zh: '罕见特殊物品', short: '★ 金', en: 'Rare Special', p: 0.0026 },
+];
+const WEARS = [
+  { zh: '崭新出厂', short: '崭新', en: 'Factory New', lo: 0, hi: 0.07 },
+  { zh: '略有磨损', short: '略磨', en: 'Minimal Wear', lo: 0.07, hi: 0.15 },
+  { zh: '久经沙场', short: '久经', en: 'Field-Tested', lo: 0.15, hi: 0.38 },
+  { zh: '破损不堪', short: '破损', en: 'Well-Worn', lo: 0.38, hi: 0.45 },
+  { zh: '战痕累累', short: '战痕', en: 'Battle-Scarred', lo: 0.45, hi: 1 },
+];
+// Wear-rating roll used by the game: bracket first (3/24/33/24/16), uniform inside it, then remapped into the skin's own float range
+const WEAR_DIST = [[0, 0.07, 0.03], [0.07, 0.15, 0.24], [0.15, 0.38, 0.33], [0.38, 0.45, 0.24], [0.45, 1, 0.16]];
+const ST_CHANCE = 0.10;
+const FEE = { buff: 0.975, steam: 1 / 1.15 };
+const SRC_NAME = { buff: 'BUFF', steam: 'Steam' };
+const WEAPON_TYPE = { 'Five-SeveN': '手枪', 'MAC-10': '微型冲锋枪', 'MAG-7': '霰弹枪', 'MP5-SD': '微型冲锋枪', 'P2000': '手枪', 'SCAR-20': '狙击步枪', 'Sawed-Off': '霰弹枪', 'PP-Bizon': '微型冲锋枪', 'G3SG1': '狙击步枪', 'M4A1-S': '步枪', 'XM1014': '霰弹枪', 'USP-S': '手枪', 'Dual Berettas': '手枪', 'FAMAS': '步枪', 'MP7': '微型冲锋枪', 'AK-47': '步枪', 'MP9': '微型冲锋枪' };
+const KNIVES = ['butterfly', 'huntsman', 'bowie', 'falchion', 'daggers'];
+const ITEMS = DATA.items;
+const META = DATA.meta;
+const MAX_LOG = 100000;
+const REEL_LEN = 62, WIN_AT = 52;
+const P_GOLD = TIERS[4].p;
+
+function wearProbs(it) {
+  const span = it.max - it.min;
+  return WEARS.map((w) => {
+    const a = Math.max(0, (w.lo - it.min) / span), b = Math.min(1, (w.hi - it.min) / span);
+    if (b <= a) return 0;
+    let p = 0;
+    for (const [lo, hi, pw] of WEAR_DIST) { const x = Math.max(lo, a), y = Math.min(hi, b); if (y > x) p += pw * (y - x) / (hi - lo); }
+    return p;
+  });
+}
+const POOLS = TIERS.map((t) => {
+  const idx = []; let sum = 0;
+  ITEMS.forEach((it, i) => { if (it.tier === t.id) { idx.push(i); sum += it.w; } });
+  let acc = 0; const cum = idx.map((i) => (acc += ITEMS[i].w / sum));
+  cum[cum.length - 1] = 1;
+  return { idx, cum, sum };
+});
+ITEMS.forEach((it, i) => { it.id = i; it.p = TIERS[it.tier].p * it.w / POOLS[it.tier].sum; it.wp = wearProbs(it); });
+const TIER_CUM = (() => { let a = 0; const c = TIERS.map((t) => (a += t.p)); c[4] = 1; return c; })();
+
+/* ================= random ================= */
+const rng = (() => {
+  const s = new Uint32Array(4);
+  try { crypto.getRandomValues(s); } catch (e) { for (let k = 0; k < 4; k++) s[k] = (Math.random() * 4294967296) >>> 0; }
+  let a = s[0], b = s[1], c = s[2], d = s[3] | 1;
+  return () => {
+    a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
+    let t = (a + b) | 0; a = b ^ (b >>> 9); b = (c + (c << 3)) | 0; c = (c << 21) | (c >>> 11); d = (d + 1) | 0; t = (t + d) | 0; c = (c + t) | 0;
+    return (t >>> 0) / 4294967296;
+  };
+})();
+for (let k = 0; k < 20; k++) rng();
+function rollIndex() {
+  const r = rng(); let t = 0; while (t < 4 && r >= TIER_CUM[t]) t++;
+  const pool = POOLS[t], q = rng(); let j = 0; while (j < pool.cum.length - 1 && q >= pool.cum[j]) j++;
+  return pool.idx[j];
+}
+function genFloat(it) {
+  const r = rng(); let acc = 0, seg = WEAR_DIST[4];
+  for (const s of WEAR_DIST) { acc += s[2]; if (r < acc) { seg = s; break; } }
+  const raw = seg[0] + rng() * (seg[1] - seg[0]);
+  return it.min + raw * (it.max - it.min);
+}
+function roll() {
+  const i = rollIndex(), it = ITEMS[i];
+  return { i, st: rng() < ST_CHANCE ? 1 : 0, f: genFloat(it), s: Math.floor(rng() * 1001), ts: Date.now() };
+}
+const wearOf = (f) => (f < 0.07 ? 0 : f < 0.15 ? 1 : f < 0.38 ? 2 : f < 0.45 ? 3 : 4);
+
+/* ================= state ================= */
+const DEFAULTS = { src: 'buff', key: 17, casePrice: null, fee: false, skip: false, speed: 'normal', sound: true, qty: 1, mcN: 100 };
+let settings = { ...DEFAULTS };
+let opens = [];
+const ui = { tab: 'stats', invFilter: -1, invSort: 'new', invST: false, invShown: 120, oddsST: false };
+const reducedMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const LS_KEY = 'cs2sim.dreams-nightmares.v1';
+
+function loadStore() { try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+function packOpens(list) { return list.map((o) => [o.i, o.st, Math.round(o.f * 1e10) / 1e10, o.s, Math.round(o.ts / 1000)]); }
+function unpackOpens(arr) {
+  if (!Array.isArray(arr)) return [];
+  return arr.filter((a) => Array.isArray(a) && ITEMS[a[0]] && isFinite(a[2])).map((a) => ({ i: a[0], st: a[1] ? 1 : 0, f: +a[2], s: a[3] | 0, ts: (a[4] || 0) * 1000 }));
+}
+let saveTimer = 0;
+function scheduleSave() { clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 400); }
+function saveNow() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ v: 1, settings, opens: packOpens(opens) })); }
+  catch (e) { try { localStorage.setItem(LS_KEY, JSON.stringify({ v: 1, settings, opens: packOpens(opens.slice(-30000)) })); } catch (e2) { /* storage unavailable */ } }
+}
+
+/* ================= money helpers ================= */
+const nf2 = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const nf0 = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat('zh-CN', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const yuan = (v) => (v < 0 ? '−' : '') + '¥' + nf2.format(Math.abs(v));
+const yuanS = (v) => (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + '¥' + nf2.format(Math.abs(v));
+function yuanC(v) {
+  const a = Math.abs(v), s = v < 0 ? '−' : '';
+  if (a >= 1e8) return s + '¥' + (a / 1e8).toFixed(2) + '亿';
+  if (a >= 1e4) return s + '¥' + (a / 1e4).toFixed(a >= 1e5 ? 1 : 2).replace(/\.0+$/, '') + '万';
+  if (a >= 100) return s + '¥' + nf0.format(Math.round(a));
+  return s + '¥' + (a >= 10 ? a.toFixed(1) : a.toFixed(2)).replace(/\.0+$/, '');
+}
+const pct = (v, d = 1) => (v * 100).toFixed(d) + '%';
+function pctP(p) { const v = p * 100; return (v >= 1 ? v.toFixed(2) : v >= 0.1 ? v.toFixed(3) : v >= 0.001 ? v.toFixed(4) : v.toFixed(5)) + '%'; }
+const oneIn = (p) => '1/' + nf0.format(Math.round(1 / p));
+const casePrice = () => (settings.casePrice == null ? META.casePrice[settings.src] : settings.casePrice);
+const costPer = () => settings.key + casePrice();
+const feeMul = () => (settings.fee ? FEE[settings.src] : 1);
+function priceOf(i, w, st) { const p = ITEMS[i].price[settings.src][w]; return p ? p[st] : 0; }
+const valueOf = (o) => priceOf(o.i, wearOf(o.f), o.st) * feeMul();
+function itemEV(i) {
+  const it = ITEMS[i]; let e = 0;
+  for (let w = 0; w < 5; w++) {
+    const p = it.wp[w], pr = it.price[settings.src][w];
+    if (p && pr) e += p * ((1 - ST_CHANCE) * pr[0] + ST_CHANCE * pr[1]);
+  }
+  return e * feeMul();
+}
+function evInfo() {
+  const per = [0, 0, 0, 0, 0];
+  ITEMS.forEach((it, i) => { per[it.tier] += it.p * itemEV(i); });
+  const ev = per.reduce((a, b) => a + b, 0);
+  return { per, avg: per.map((v, t) => v / TIERS[t].p), ev };
+}
+
+/* ================= names ================= */
+const typeZh = (it) => (it.tier === 4 ? '匕首' : WEAPON_TYPE[it.we] || '');
+const skinZh = (it) => (it.ph ? `${it.sz}（${it.phz}）` : it.sz);
+const weaponZh = (it) => (it.tier === 4 ? `★ ${it.wz}` : it.wz);
+function marketZh(it, st, w) {
+  const base = it.tier === 4 ? `${it.wz}（★${st ? ' StatTrak™' : ''}） | ${it.sz}` : `${it.wz}${st ? '（StatTrak™）' : ''} | ${it.sz}`;
+  return w == null ? base : `${base} (${WEARS[w].zh})`;
+}
+function marketEn(it, st, w) {
+  const base = it.tier === 4 ? `★ ${st ? 'StatTrak™ ' : ''}${it.we} | ${it.se}` : `${st ? 'StatTrak™ ' : ''}${it.we} | ${it.se}`;
+  return (w == null ? base : `${base} (${WEARS[w].en})`) + (it.phe ? ` · ${it.phe}` : '');
+}
+const tierText = (it) => (it.tier === 4 ? '★ 隐秘级 ' : TIERS[it.tier].zh + ' ') + typeZh(it);
+
+/* ================= DOM helpers ================= */
+const $ = (s, r = document) => r.querySelector(s);
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'text') e.textContent = v;
+    else if (k === 'style') e.style.cssText = v;
+    else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) { if (k == null || k === false) continue; e.append(k.nodeType ? k : document.createTextNode(String(k))); }
+  return e;
+}
+function img(src, alt = '', cls) { const m = new Image(); m.src = src; m.alt = alt; m.decoding = 'async'; if (cls) m.className = cls; return m; }
+function lazyImg(src, alt = '') { const m = img(src, alt); m.loading = 'lazy'; return m; }
+
+const COIN_URL = (() => {
+  let leaves = '';
+  for (const side of [-1, 1]) {
+    for (let k = 0; k < 7; k++) {
+      const deg = side < 0 ? 118 + k * 19 : 62 - k * 19;
+      const a = deg * Math.PI / 180, R = 33;
+      const x = 60 + R * Math.cos(a), y = 44 + R * Math.sin(a);
+      const rot = deg + (side < 0 ? -22 : 22);
+      leaves += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="3.4" ry="7.6" transform="rotate(${rot.toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+    }
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 90"><defs><radialGradient id="g" cx="40%" cy="34%" r="72%"><stop offset="0" stop-color="#fff8d6"/><stop offset=".45" stop-color="#f5d25c"/><stop offset="1" stop-color="#b17d10"/></radialGradient><linearGradient id="l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbe7a1"/><stop offset="1" stop-color="#c89422"/></linearGradient></defs><g fill="url(#l)" stroke="#7d560b" stroke-width=".9">${leaves}</g><path d="M44 78 Q60 86 76 78" fill="none" stroke="#8a5f0d" stroke-width="2.4" stroke-linecap="round"/><circle cx="60" cy="43" r="24.5" fill="url(#g)" stroke="#71500c" stroke-width="1.8"/><circle cx="60" cy="43" r="18.6" fill="#f8d966" stroke="#b5841c" stroke-width="1.3"/><text x="60" y="52.5" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="27" font-weight="900" fill="#fffbe9" stroke="#9a6d10" stroke-width="1.3">?</text></svg>`;
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+})();
+
+/* ================= sound ================= */
+const Snd = {
+  ctx: null, out: null, noise: null, lastTick: 0,
+  init() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {}); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    try {
+      this.ctx = new AC();
+      this.out = this.ctx.createGain(); this.out.gain.value = 0.55; this.out.connect(this.ctx.destination);
+      const len = this.ctx.sampleRate * 0.5, buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate), ch = buf.getChannelData(0);
+      for (let k = 0; k < len; k++) ch[k] = Math.random() * 2 - 1;
+      this.noise = buf;
+    } catch (e) { this.ctx = null; }
+  },
+  ok() { return settings.sound && this.ctx && this.ctx.state === 'running'; },
+  env(g, t, peak, a, d) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + a + d); },
+  burst(t, freq, q, peak, dur, type = 'bandpass') {
+    const s = this.ctx.createBufferSource(); s.buffer = this.noise;
+    const f = this.ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = this.ctx.createGain(); this.env(g, t, peak, 0.002, dur);
+    s.connect(f).connect(g).connect(this.out); s.start(t); s.stop(t + dur + 0.05);
+  },
+  tone(t, freq, type, peak, a, d, dest) {
+    const o = this.ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
+    const g = this.ctx.createGain(); this.env(g, t, peak, a, d);
+    o.connect(g).connect(dest || this.out); o.start(t); o.stop(t + a + d + 0.05);
+    return o;
+  },
+  tick() {
+    if (!this.ok()) return;
+    const now = this.ctx.currentTime; if (now - this.lastTick < 0.018) return; this.lastTick = now;
+    this.burst(now, 3200, 2.5, 0.35, 0.025);
+    const o = this.tone(now, 1900, 'triangle', 0.12, 0.001, 0.035); o.frequency.exponentialRampToValueAtTime(1100, now + 0.035);
+  },
+  unlock() {
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    this.burst(t, 1400, 1.2, 0.5, 0.06); this.burst(t + 0.07, 2600, 3, 0.35, 0.05);
+    const o = this.tone(t, 140, 'sine', 0.5, 0.004, 0.25); o.frequency.exponentialRampToValueAtTime(55, t + 0.25);
+    this.burst(t + 0.05, 600, 0.6, 0.12, 0.5, 'lowpass');
+  },
+  land() {
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    const o = this.tone(t, 220, 'sine', 0.35, 0.003, 0.18); o.frequency.exponentialRampToValueAtTime(90, t + 0.18);
+    this.burst(t, 1800, 1, 0.18, 0.04);
+  },
+  reveal(tier) {
+    if (!this.ok()) return; const t = this.ctx.currentTime;
+    const delay = this.ctx.createDelay(); delay.delayTime.value = 0.18;
+    const fb = this.ctx.createGain(); fb.gain.value = tier >= 3 ? 0.38 : 0.25;
+    const wet = this.ctx.createGain(); wet.gain.value = 0.45;
+    delay.connect(fb).connect(delay); delay.connect(wet).connect(this.out);
+    const bus = this.ctx.createGain(); bus.connect(this.out); bus.connect(delay);
+    const sets = [[523.25, 659.25], [523.25, 659.25, 783.99], [587.33, 739.99, 880, 1174.66], [440, 554.37, 659.25, 880, 1108.73], [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093]];
+    const notes = sets[tier], gap = tier === 4 ? 0.075 : 0.06;
+    notes.forEach((f, k) => {
+      this.tone(t + k * gap, f, 'triangle', 0.16, 0.01, tier >= 3 ? 1.4 : 0.8, bus);
+      if (tier >= 2) this.tone(t + k * gap, f * 2, 'sine', 0.05, 0.01, 0.9, bus);
+    });
+    if (tier >= 3) { const o = this.tone(t, 110, 'sine', 0.45, 0.01, 0.9, bus); o.frequency.exponentialRampToValueAtTime(55, t + 0.9); }
+    if (tier === 4) for (let k = 0; k < 14; k++) this.tone(t + 0.45 + k * 0.05, 2400 + Math.random() * 2400, 'sine', 0.04, 0.005, 0.25, bus);
+    setTimeout(() => { for (const nd of [bus, delay, fb, wet]) { try { nd.disconnect(); } catch (e) { /* already gone */ } } }, 4500);
+  },
+};
+
+/* ================= elements ================= */
+const stage = $('#stage'), reel = $('#reel'), reelWrap = $('#reelWrap');
+const openBtn = $('#openBtn'), skipBtn = $('#skipBtn'), qtySel = $('#qtySel');
+const skipToggle = $('#skipToggle'), skipToggle2 = $('#skipToggle2');
+const rv = $('#reveal'), modal = $('#modal'), tip = $('#tip'), toastEl = $('#toast');
+let busy = false, lastFocus = null;
+
+/* ================= stage: contents grid ================= */
+function renderGrid() {
+  const grid = $('#grid'); grid.textContent = '';
+  const weapons = ITEMS.filter((it) => it.tier < 4).sort((a, b) => a.tier - b.tier || a.id - b.id);
+  for (const it of weapons) {
+    grid.append(h('button', { class: 'card r' + it.tier, type: 'button', title: `${it.wz} | ${it.sz} · ${TIERS[it.tier].zh}`, onclick: () => openItemModal(it.id) },
+      h('span', { class: 'card-img' }, img(it.img, '')),
+      h('span', { class: 'card-name' }, h('b', { text: it.wz }), h('small', { text: it.sz }))));
+  }
+  grid.append(h('button', { class: 'card r4', type: 'button', title: '★ 罕见特殊物品 ★：5 种匕首 × 6 种伽玛涂装', onclick: openKnifeModal },
+    h('span', { class: 'card-img' }, img(COIN_URL, '')),
+    h('span', { class: 'card-name' }, h('b', { text: '★ 罕见特殊物品' }), h('small', { text: '5 种匕首 · 伽玛涂装' }))));
+}
+
+/* ================= opening ================= */
+function setSpinUI(on) {
+  $('#idleActions').hidden = on; $('#spinActions').hidden = !on;
+  if (on) skipBtn.focus({ preventScroll: true });
+}
+function commit(list) {
+  for (const o of list) opens.push(o);
+  if (opens.length > MAX_LOG) opens.splice(0, opens.length - MAX_LOG);
+  scheduleSave();
+  refreshAll();
+}
+function openCase() {
+  if (busy) return;
+  Snd.init();
+  const n = +settings.qty || 1;
+  if (n > 1) { openBatch(n); return; }
+  const res = roll();
+  if (settings.skip) { Snd.unlock(); commit([res]); showReveal(res); return; }
+  busy = true;
+  setSpinUI(true);
+  Snd.unlock();
+  spin(res, () => { commit([res]); showReveal(res); });
+}
+function openBatch(n) {
+  const list = []; for (let k = 0; k < n; k++) list.push(roll());
+  commit(list);
+  const top = Math.max(...list.map((o) => ITEMS[o.i].tier));
+  Snd.unlock(); setTimeout(() => Snd.reveal(top), 120);
+  showBatchModal(list);
+}
+
+/* reel animation */
+const Spin = { raf: 0, running: false, finish: null };
+function makeTile(it) {
+  const d = h('div', { class: 'tile r' + it.tier });
+  d.append(img(it.tier === 4 ? COIN_URL : it.img, ''));
+  return d;
+}
+function spin(res, done) {
+  reel.textContent = ''; reel.classList.remove('landed');
+  const frag = document.createDocumentFragment();
+  for (let k = 0; k < REEL_LEN; k++) frag.append(makeTile(ITEMS[k === WIN_AT ? res.i : rollIndex()]));
+  reel.append(frag);
+  const sc = $('.stage-center'), foot = $('.stage-foot');
+  const scr = sc.getBoundingClientRect(), wr = reelWrap.getBoundingClientRect();
+  sc.style.setProperty('--shift', Math.max(0, (scr.top + (foot.getBoundingClientRect().top - scr.top) / 2) - (wr.top + wr.height / 2)).toFixed(0) + 'px');
+  stage.classList.add('spinning');
+  const t0el = reel.children[0], t1el = reel.children[1];
+  const pitch = t1el.offsetLeft - t0el.offsetLeft, w = t0el.offsetWidth;
+  const center = reelWrap.clientWidth / 2;
+  const x0 = center - (5 * pitch + w * (0.25 + rng() * 0.5));
+  const x1 = center - (WIN_AT * pitch + w / 2 + (rng() * 2 - 1) * 0.42 * w);
+  reel.style.transform = `translate3d(${x0}px,0,0)`;
+  const dur = settings.speed === 'fast' ? 2500 : 6200;
+  let last = Math.floor((center - x0) / pitch), start = 0;
+  Spin.running = true;
+  const frame = (now) => {
+    if (!start) start = now;
+    const t = Math.min(1, (now - start) / dur);
+    const e = 1 - Math.pow(1 - t, 3);
+    const x = x0 + (x1 - x0) * e;
+    reel.style.transform = `translate3d(${x.toFixed(2)}px,0,0)`;
+    const idx = Math.floor((center - x) / pitch);
+    if (idx !== last) { last = idx; Snd.tick(); }
+    if (t < 1) Spin.raf = requestAnimationFrame(frame); else finish(false);
+  };
+  const finish = (skipped) => {
+    if (!Spin.running) return;
+    Spin.running = false; cancelAnimationFrame(Spin.raf);
+    reel.style.transform = `translate3d(${x1}px,0,0)`;
+    reel.children[WIN_AT].classList.add('win'); reel.classList.add('landed');
+    Snd.land();
+    setTimeout(done, skipped ? 220 : 700);
+  };
+  Spin.finish = () => finish(true);
+  Spin.raf = requestAnimationFrame(frame);
+}
+function resetStage() {
+  stage.classList.remove('spinning');
+  setSpinUI(false);
+  busy = false;
+  setTimeout(() => { if (!stage.classList.contains('spinning')) { reel.textContent = ''; reel.classList.remove('landed'); } }, 450);
+}
+
+/* ================= reveal ================= */
+let rvMode = 'reveal';
+function showReveal(o, inspect = false) {
+  const it = ITEMS[o.i], w = wearOf(o.f);
+  rvMode = inspect ? 'inspect' : 'reveal';
+  rv.className = 'overlay reveal r' + it.tier + (inspect ? ' inspect' : '');
+  const im = $('#rvImg'); im.src = it.img; im.alt = marketZh(it, o.st, w);
+  $('#rvTier').textContent = tierText(it);
+  $('#rvST').hidden = !o.st;
+  $('#rvName').textContent = `${weaponZh(it)} | ${skinZh(it)}`;
+  $('#rvEn').textContent = marketEn(it, o.st, w);
+  $('#rvWear').textContent = WEARS[w].zh;
+  $('#rvFloat').textContent = o.f.toFixed(10);
+  $('#rvSeed').textContent = o.s;
+  $('#rvPriceLab').textContent = (settings.fee ? '到手价 · ' : '参考价 · ') + SRC_NAME[settings.src];
+  $('#rvPrice').textContent = yuan(valueOf(o));
+  const bar = $('#rvWearbar'); bar.textContent = '';
+  if (it.min > 0) bar.append(h('i', { class: 'out', style: `left:0;width:${it.min * 100}%` }));
+  if (it.max < 1) bar.append(h('i', { class: 'out', style: `left:${it.max * 100}%;right:0` }));
+  bar.append(h('i', { class: 'ptr', style: `left:${(o.f * 100).toFixed(3)}%` }));
+  $('#rvFlavor').textContent = it.fz ? `“${it.fz}”` : '';
+  $('#rvFlavor').hidden = !it.fz;
+  $('#rvClose').textContent = inspect ? '关闭' : '收下';
+  $('#rvAgain').hidden = inspect;
+  $('#rvAgain').textContent = `再开一个 · ${yuan(costPer())}`;
+  const sparks = $('#rvSparks'); sparks.textContent = '';
+  if (it.tier >= 3 && !inspect && !reducedMotion) {
+    const count = it.tier === 4 ? 26 : 12;
+    for (let k = 0; k < count; k++) {
+      const a = rng() * Math.PI * 2, r = 120 + rng() * 200;
+      sparks.append(h('i', { style: `left:${46 + rng() * 8}%;top:${44 + rng() * 10}%;--dx:${(Math.cos(a) * r).toFixed(0)}px;--dy:${(Math.sin(a) * r * 0.7).toFixed(0)}px;animation-delay:${(0.15 + rng() * 0.5).toFixed(2)}s;${it.tier === 3 ? 'background:#ffd0d0;box-shadow:0 0 10px 2px rgba(235,75,75,.8)' : ''}` }));
+    }
+  }
+  // restart CSS animations
+  rv.hidden = true; void rv.offsetWidth; rv.hidden = false;
+  document.body.style.overflow = 'hidden';
+  if (!inspect) {
+    Snd.reveal(it.tier);
+    $('#live').textContent = `获得 ${marketZh(it, o.st, w)}，参考价 ${yuan(valueOf(o))}`;
+  }
+  lastFocus = inspect ? document.activeElement : null;
+  setTimeout(() => (inspect ? $('#rvClose') : $('#rvAgain')).focus({ preventScroll: true }), 30);
+}
+function closeReveal(again) {
+  if (rv.hidden) return;
+  rv.hidden = true; if (modal.hidden) document.body.style.overflow = '';
+  if (rvMode === 'reveal') {
+    resetStage();
+    if (again) setTimeout(openCase, 60); else openBtn.focus({ preventScroll: true });
+  } else if (lastFocus) lastFocus.focus({ preventScroll: true });
+}
+
+/* ================= modal ================= */
+function openModal(title, body) {
+  $('#modalTitle').textContent = title;
+  const mb = $('#modalBody'); mb.textContent = ''; mb.append(body);
+  lastFocus = document.activeElement;
+  modal.hidden = false; document.body.style.overflow = 'hidden';
+  setTimeout(() => $('.close-x', modal).focus({ preventScroll: true }), 20);
+}
+function closeModal() {
+  if (modal.hidden) return;
+  modal.hidden = true; document.body.style.overflow = '';
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
+}
+function priceCells(it, st) {
+  return WEARS.map((w, k) => {
+    const pr = it.price[settings.src][k];
+    if (!it.wp[k] || !pr) return h('td', { class: 'num muted', text: '—' });
+    const est = it.est[settings.src][k][st ? 1 : 0];
+    return h('td', { class: 'num' }, yuanC(pr[st ? 1 : 0] * feeMul()), est ? h('span', { class: 'est', title: '缺少成交数据，按相邻磨损或另一平台价格估算', text: '估' }) : null);
+  });
+}
+function openItemModal(i) {
+  const it = ITEMS[i];
+  const body = h('div', { class: 'r' + it.tier },
+    h('div', { style: 'display:grid;grid-template-columns:minmax(0,280px) minmax(0,1fr);gap:18px;align-items:center', class: 'item-detail' },
+      h('div', { class: 'inv-img', style: 'border-radius:6px' }, img(it.img, '')),
+      h('div', null,
+        h('div', { class: 'rv-tier', style: 'animation:none' }, h('span', { class: 'pill', text: tierText(it) })),
+        h('p', { style: 'margin:8px 0 2px;font-size:22px;font-weight:700', text: `${weaponZh(it)} | ${skinZh(it)}` }),
+        h('p', { class: 'muted', style: 'margin:0 0 8px', text: marketEn(it, 0) }),
+        it.fz ? h('p', { style: 'margin:0 0 10px;font-style:italic;color:var(--ink-2)', text: `“${it.fz}”` }) : null,
+        h('div', { class: 'facts' },
+          h('div', { class: 'fact' }, h('div', { class: 'lab', text: '单件掉落概率' }), h('div', { class: 'val', text: pctP(it.p) }), h('div', { class: 'sub', text: `约 ${oneIn(it.p)} 箱` })),
+          h('div', { class: 'fact' }, h('div', { class: 'lab', text: '磨损区间' }), h('div', { class: 'val num', text: `${it.min.toFixed(2)} – ${it.max.toFixed(2)}` }), h('div', { class: 'sub', text: WEARS.filter((w, k) => it.wp[k] > 0).map((w) => w.short).join(' / ') })),
+        ))),
+    h('div', { class: 'table-wrap', style: 'margin-top:16px' },
+      h('table', null,
+        h('thead', null, h('tr', null, h('th', { text: `参考价（${SRC_NAME[settings.src]}${settings.fee ? '，到手' : ''}）` }), ...WEARS.map((w) => h('th', { class: 'num', text: w.zh })))),
+        h('tbody', null,
+          h('tr', null, h('td', { text: '普通' }), ...priceCells(it, 0)),
+          h('tr', null, h('td', { text: 'StatTrak™' }), ...priceCells(it, 1)),
+          h('tr', null, h('td', { text: '出现该外观的概率' }), ...it.wp.map((p) => h('td', { class: 'num muted', text: p ? pct(p, 1) : '—' })))))),
+    h('p', { class: 'muted', style: 'margin:10px 0 0;font-size:12.5px', text: `这件物品对每箱期望价值的贡献：${yuan(it.p * itemEV(i))}。` }));
+  openModal(`${weaponZh(it)} | ${skinZh(it)}`, body);
+}
+function openKnifeModal() {
+  const wrap = h('div', null, h('p', { class: 'muted', style: 'margin:0 0 14px', text: `开出任意一把刀的概率为 0.26%（约 ${oneIn(P_GOLD)} 箱）。先等概率选刀型与涂装（各 1/30），伽玛多普勒再判定相位。` }));
+  for (const kn of KNIVES) {
+    const list = ITEMS.filter((it) => it.tier === 4 && it.knife === kn);
+    const sec = h('div', { class: 'knife-sec' }, h('h3', { text: `★ ${list[0].wz}` }));
+    const grid = h('div', { class: 'knife-grid' });
+    for (const it of list) {
+      const lo = Math.min(...it.price[settings.src].map((p, k) => (it.wp[k] > 0 && p && p[0] != null ? p[0] : Infinity))) * feeMul();
+      grid.append(h('button', { class: 'inv-card r4', type: 'button', onclick: () => { closeModal(); setTimeout(() => openItemModal(it.id), 30); } },
+        h('div', { class: 'inv-img' }, lazyImg(it.img, '')),
+        h('div', { class: 'inv-meta' }, h('b', { text: skinZh(it) }), h('span', { text: `${pctP(it.p)} · ${oneIn(it.p)}` }), h('span', { class: 'pr', text: `${yuanC(lo)} 起` }))));
+    }
+    sec.append(grid); wrap.append(sec);
+  }
+  openModal('★ 罕见特殊物品 ★', wrap);
+}
+function showBatchModal(list) {
+  const cost = costPer() * list.length;
+  const value = list.reduce((a, o) => a + valueOf(o), 0);
+  const counts = [0, 0, 0, 0, 0]; list.forEach((o) => counts[ITEMS[o.i].tier]++);
+  const best = list.slice().sort((a, b) => valueOf(b) - valueOf(a)).slice(0, 24);
+  const kp = (lab, val, cls) => h('div', { class: 'kpi' }, h('div', { class: 'lab', text: lab }), h('div', { class: 'val' + (cls ? ' ' + cls : ''), text: val }));
+  const body = h('div', null,
+    h('div', { class: 'kpis', style: 'grid-template-columns:repeat(auto-fit,minmax(140px,1fr))' },
+      kp('花费', yuan(cost)), kp('出货价值', yuan(value)), kp('盈亏', yuanS(value - cost), value >= cost ? 'good' : 'bad'), kp('回报率', pct(value / cost))),
+    h('div', { class: 'batch-tiers' }, TIERS.map((t, k) => h('div', { class: 'batch-tier r' + k }, h('div', { class: 'lab', text: t.zh }), h('div', { class: 'val', text: nf0.format(counts[k]) })))),
+    h('h3', { style: 'margin:0 0 10px;font-size:15px', text: list.length > 24 ? '价值最高的 24 件' : '全部掉落' }),
+    h('div', { class: 'inv-grid' }, best.map(invCard)));
+  openModal(`批量开箱 × ${nf0.format(list.length)}`, body);
+}
+
+/* ================= HUD & stats ================= */
+let cache = null;
+function stats() {
+  if (cache) return cache;
+  const cost = costPer(), n = opens.length;
+  const tierCount = [0, 0, 0, 0, 0], wearCount = [0, 0, 0, 0, 0], wearExp = [0, 0, 0, 0, 0];
+  const cum = new Float64Array(n), vals = new Float64Array(n), golds = [];
+  let value = 0, stN = 0, best = -1, bestV = -1, minF = 2, minFi = -1;
+  for (let k = 0; k < n; k++) {
+    const o = opens[k], it = ITEMS[o.i], v = valueOf(o);
+    vals[k] = v; value += v; cum[k] = value - cost * (k + 1);
+    tierCount[it.tier]++;
+    wearCount[wearOf(o.f)]++;
+    for (let j = 0; j < 5; j++) wearExp[j] += it.wp[j];
+    if (o.st) stN++;
+    if (v > bestV) { bestV = v; best = k; }
+    if (o.f < minF) { minF = o.f; minFi = k; }
+    if (it.tier === 4) golds.push(k);
+  }
+  cache = { n, cost, totalCost: n * cost, value, net: value - n * cost, tierCount, wearCount, wearExp, stN, best, bestV, minFi, golds, cum, vals, ev: evInfo() };
+  return cache;
+}
+function refreshAll() {
+  cache = null;
+  renderHUD();
+  renderCostLabel();
+  $('#invCount').textContent = nf0.format(opens.length);
+  if (ui.tab === 'stats') renderStats();
+  if (ui.tab === 'inv') renderInv();
+  if (ui.tab === 'odds') renderOdds();
+  if (ui.tab === 'cost') renderSettings();
+}
+function renderHUD() {
+  const s = stats();
+  $('#hudN').textContent = nf0.format(s.n);
+  const yh = (v) => (Math.abs(v) < 1e5 ? yuan(v) : yuanC(v));
+  $('#hudCost').textContent = yh(s.totalCost);
+  $('#hudVal').textContent = yh(s.value);
+  const net = $('#hudNet'); net.textContent = (s.net > 0 ? '+' : '') + yh(s.net);
+  net.className = s.n ? (s.net >= 0 ? 'good' : 'bad') : '';
+}
+function renderCostLabel() {
+  $('#costLabel').textContent = `每次 ${yuan(costPer())}（钥匙 ${yuan(settings.key)} + 箱子 ${yuan(casePrice())}）`;
+}
+function renderStats() {
+  const s = stats(), cost = s.cost, ev = s.ev;
+  const kp = (lab, val, sub, cls) => h('div', { class: 'kpi' }, h('div', { class: 'lab', text: lab }), h('div', { class: 'val' + (cls ? ' ' + cls : ''), text: val }), h('div', { class: 'sub', text: sub }));
+  const k = $('#kpis'); k.textContent = '';
+  k.append(
+    kp('开箱次数', nf0.format(s.n), s.n ? `StatTrak™ ${nf0.format(s.stN)} 件` : '还没有开箱记录'),
+    kp('总花费', yuan(s.totalCost), `每箱 ${yuan(cost)}`),
+    kp('出货总价值', yuan(s.value), `${SRC_NAME[settings.src]}${settings.fee ? ' 到手价' : ' 参考价'}`),
+    kp('净盈亏', s.n ? yuanS(s.net) : '¥0.00', s.n ? (s.net >= 0 ? '▲ 赚了' : '▼ 亏了') : '—', s.n ? (s.net >= 0 ? 'good' : 'bad') : ''),
+    kp('实际回报率', s.n ? pct(s.value / s.totalCost) : '—', '出货价值 ÷ 花费'),
+    kp('理论回报率', pct(ev.ev / cost), `每箱期望 ${yuan(ev.ev)}`));
+  // EV composition
+  $('#evDesc').textContent = `按当前价格，每开一箱平均能开出 ${yuan(ev.ev)} 的物品，而成本是 ${yuan(cost)}，理论上每箱亏 ${yuan(cost - ev.ev)}。0.26% 的刀贡献了 ${pct(ev.per[4] / ev.ev, 0)} 的期望价值。`;
+  const stack = $('#evStack'); stack.textContent = '';
+  TIERS.forEach((t, j) => {
+    const seg = h('div', { class: 'r' + j, style: `flex:${Math.max(ev.per[j], 0.0001)} 1 0`, tabindex: '0', 'aria-label': `${t.zh} ${yuan(ev.per[j])}` });
+    bindTip(seg, () => [tipRow(yuan(ev.per[j]), `${t.zh} · 每箱贡献`), tipRow(pct(ev.per[j] / ev.ev), '占期望价值')]);
+    stack.append(seg);
+  });
+  const sl = $('#evStackLabels'); sl.textContent = '';
+  TIERS.forEach((t, j) => sl.append(h('span', { style: `flex:${Math.max(ev.per[j], 0.0001)} 1 0`, text: `${j === 4 ? '★ 刀' : t.short} ${pct(ev.per[j] / ev.ev, 0)}` })));
+  requestAnimationFrame(() => { for (const x of sl.children) x.classList.toggle('off', x.scrollWidth > x.clientWidth + 1); });
+  const et = $('#evTable'); et.textContent = '';
+  et.append(h('thead', null, h('tr', null, h('th', { text: '稀有度' }), h('th', { class: 'num', text: '档位概率' }), h('th', { class: 'num', text: '平均价值' }), h('th', { class: 'num', text: '每箱贡献' }), h('th', { class: 'num', text: '占比' }))),
+    h('tbody', null, TIERS.map((t, j) => h('tr', { class: 'r' + j }, h('td', null, h('span', { class: 'swatch' }), t.zh), h('td', { class: 'num', text: pct(t.p, 2) }), h('td', { class: 'num', text: yuan(ev.avg[j]) }), h('td', { class: 'num', text: yuan(ev.per[j]) }), h('td', { class: 'num', text: pct(ev.per[j] / ev.ev) })))));
+  renderRatio(s); renderGold(s); renderPL(s); renderWear(s); renderRecent(s);
+  if (!mcState.result && !mcState.running) runMC();
+  else if (mcState.result) renderMC();
+}
+function renderRatio(s) {
+  const box = $('#ratioBox'); box.textContent = '';
+  const MAXR = 3;
+  const rows = h('div', { class: 'ratio-rows' });
+  TIERS.forEach((t, j) => {
+    const exp = s.n * t.p, act = s.tierCount[j], ratio = exp > 0 ? act / exp : 0;
+    const track = h('div', { class: 'ratio-track' });
+    if (s.n) track.append(h('i', { class: 'ratio-bar', style: `width:${Math.min(ratio, MAXR) / MAXR * 100}%${ratio > MAXR ? ';border-radius:0' : ''}` }));
+    track.append(h('i', { class: 'ratio-ref', style: `left:${100 / MAXR}%` }));
+    const row = h('div', { class: 'ratio-row r' + j, tabindex: '0' },
+      h('span', null, h('span', { class: 'swatch' }), t.zh),
+      track,
+      h('span', { class: 'ratio-val' }, h('b', { text: nf0.format(act) }), ` / 期望 ${exp < 10 ? exp.toFixed(2) : nf1.format(exp)}`));
+    bindTip(row, () => [tipRow(s.n ? pct(ratio, 0) : '—', `${t.zh} · 实际 ÷ 理论`), tipRow(s.n ? pct(act / s.n, 2) : '—', `实际占比（理论 ${pct(t.p, 2)}）`)]);
+    rows.append(row);
+  });
+  box.append(rows,
+    h('div', { class: 'ratio-axis', 'aria-hidden': 'true', style: 'margin-top:6px' }, h('span'), h('div', { class: 'ticks' }, [0, 1, 2, 3].map((v) => h('span', { style: `left:${v / MAXR * 100}%`, text: v === 3 ? '≥300%' : v * 100 + '%' }))), h('span')));
+  if (!s.n) box.append(h('p', { class: 'muted', style: 'margin:10px 0 0;font-size:12.5px', text: '开箱后在这里对比每个档位的实际次数与理论期望。' }));
+}
+function renderGold(s) {
+  const box = $('#goldBox'); box.textContent = '';
+  const g = s.golds.length, exp = s.n * P_GOLD;
+  const since = g ? s.n - 1 - s.golds[g - 1] : s.n;
+  const atLeast = 1 - Math.pow(1 - P_GOLD, s.n);
+  const fact = (lab, val, sub) => h('div', { class: 'fact' }, h('div', { class: 'lab', text: lab }), h('div', { class: 'val', text: val }), h('div', { class: 'sub', text: sub }));
+  box.append(h('div', { class: 'facts' },
+    fact('已出金', `${g} 次`, `理论期望 ${exp.toFixed(2)} 次`),
+    fact(g ? '距上次出金' : '尚未出金', `${nf0.format(since)} 箱`, g ? `上一把：${ITEMS[opens[s.golds[g - 1]].i].wz} | ${skinZh(ITEMS[opens[s.golds[g - 1]].i])}` : '已连续开出的非金箱数'),
+    fact('开这么多箱至少出一金的概率', s.n ? pct(atLeast, 1) : '—', `按 1 − (1 − 0.26%)^${nf0.format(s.n)} 计算`),
+    fact('平均出一把刀的成本', yuanC(costPer() / P_GOLD), `约 ${nf0.format(Math.round(1 / P_GOLD))} 箱 × ${yuan(costPer())}`)));
+  const need = h('div', { class: 'need' }, h('div', { class: 'muted', style: 'font-size:12.5px;margin-bottom:4px', text: '想要“有把握”出金，需要开的箱数：' }));
+  const qs = [0.5, 0.9, 0.99], maxN = Math.ceil(Math.log(0.01) / Math.log(1 - P_GOLD));
+  for (const q of qs) {
+    const nn = Math.ceil(Math.log(1 - q) / Math.log(1 - P_GOLD));
+    const row = h('div', { class: 'need-row', tabindex: '0' }, h('span', { text: `${pct(q, 0)} 把握` }), h('div', null, h('div', { class: 'need-bar', style: `width:${nn / maxN * 100}%` })), h('span', { class: 'num', text: `${nf0.format(nn)} 箱 · ${yuanC(nn * costPer())}` }));
+    bindTip(row, () => [tipRow(`${nf0.format(nn)} 箱`, `至少出一金的概率达到 ${pct(q, 0)}`), tipRow(yuan(nn * costPer()), '对应成本')]);
+    need.append(row);
+  }
+  box.append(need);
+}
+function renderWear(s) {
+  const box = $('#wearBox'); box.textContent = '';
+  if (!s.n) { box.append(h('div', { class: 'empty', text: '开箱后在这里对比五种外观与 StatTrak™ 的实际数量和理论期望。' })); return; }
+  const maxV = Math.max(...s.wearCount, ...s.wearExp, 1);
+  const t = h('table', null,
+    h('thead', null, h('tr', null, h('th', { text: '外观' }), h('th', { text: '实际 / 理论' }), h('th', { class: 'num', text: '实际' }), h('th', { class: 'num', text: '理论' }))),
+    h('tbody', null, WEARS.map((w, k) => {
+      const tr = h('tr', { tabindex: '0' },
+        h('td', { text: w.zh }),
+        h('td', { style: 'width:46%' }, h('div', { style: 'position:relative;height:12px' },
+          h('div', { style: `position:absolute;left:0;top:1px;height:10px;border-radius:0 4px 4px 0;background:var(--series);width:${s.wearCount[k] / maxV * 100}%` }),
+          h('div', { style: `position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink-2);left:calc(${s.wearExp[k] / maxV * 100}% - 1px)` }))),
+        h('td', { class: 'num', text: `${nf0.format(s.wearCount[k])}（${pct(s.wearCount[k] / s.n)}）` }),
+        h('td', { class: 'num muted', text: s.wearExp[k] < 10 ? s.wearExp[k].toFixed(2) : nf1.format(s.wearExp[k]) }));
+      bindTip(tr, () => [tipRow(nf0.format(s.wearCount[k]), `${w.zh} · 实际`), tipRow(s.wearExp[k].toFixed(2), '理论期望（竖线）')]);
+      return tr;
+    })));
+  const stExp = s.n * ST_CHANCE;
+  const minO = opens[s.minFi], minIt = ITEMS[minO.i];
+  box.append(h('div', { class: 'legend', 'aria-hidden': 'true' }, h('span', null, h('i', { class: 'key-bar' }), '实际数量'), h('span', null, h('i', { style: 'width:2px;height:12px;background:var(--ink-2)' }), '理论期望')), t,
+    h('div', { class: 'facts', style: 'margin-top:12px' },
+      h('div', { class: 'fact' }, h('div', { class: 'lab', text: 'StatTrak™' }), h('div', { class: 'val', text: `${nf0.format(s.stN)} 件` }), h('div', { class: 'sub', text: `理论 ${stExp.toFixed(1)} 件（10%）` })),
+      h('div', { class: 'fact' }, h('div', { class: 'lab', text: '最低磨损' }), h('div', { class: 'val mono', text: minO.f.toFixed(6) }), h('div', { class: 'sub', text: `${minIt.wz} | ${skinZh(minIt)}` }))));
+}
+function renderRecent(s) {
+  const box = $('#recentBox'); box.textContent = '';
+  if (!s.n) { box.append(h('div', { class: 'empty', text: '还没有出货。点上方绿色的“解锁容器”开第一箱。' })); return; }
+  for (let k = s.n - 1; k >= Math.max(0, s.n - 8); k--) box.append(recentRow(opens[k], k));
+}
+function recentRow(o) {
+  const it = ITEMS[o.i], w = wearOf(o.f);
+  return h('button', { class: 'recent-row r' + it.tier, type: 'button', onclick: () => showReveal(o, true) },
+    h('span', { class: 'bar' }), lazyImg(it.img, ''),
+    h('span', { class: 'nm' }, h('b', null, o.st ? h('span', { class: 'st-tag', text: 'ST' }) : null, `${weaponZh(it)} | ${skinZh(it)}`), h('span', { text: `${WEARS[w].zh} · ${o.f.toFixed(4)}` })),
+    h('span', { class: 'pr', text: yuan(valueOf(o)) }));
+}
+
+/* ================= charts ================= */
+function niceTicks(lo, hi, count) {
+  if (hi - lo < 1e-9) { hi = lo + 1; }
+  const raw = (hi - lo) / count, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) || 10 * mag;
+  const a = Math.floor(lo / step) * step, b = Math.ceil(hi / step) * step, out = [];
+  for (let v = a; v <= b + step * 1e-6; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+  return out;
+}
+const svgNS = 'http://www.w3.org/2000/svg';
+function s(tag, attrs) { const e = document.createElementNS(svgNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+function renderPL(st) {
+  const box = $('#plChart'); box.textContent = '';
+  const tbl = $('#plTable'); tbl.textContent = '';
+  if (!st.n) { box.append(h('div', { class: 'empty', text: '开箱后这里会画出每一箱之后的累计盈亏，并和理论期望线对照。' })); return; }
+  const W = Math.max(300, box.clientWidth || 600), H = W < 520 ? 210 : 250, m = { l: 58, r: 18, t: 14, b: 28 };
+  const n = st.n, cum = st.cum, slope = st.ev.ev - st.cost;
+  let lo = Math.min(0, slope * n), hi = Math.max(0, slope * n);
+  for (let k = 0; k < n; k++) { if (cum[k] < lo) lo = cum[k]; if (cum[k] > hi) hi = cum[k]; }
+  const yt = niceTicks(lo, hi, 5); lo = yt[0]; hi = yt[yt.length - 1];
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const X = (k) => m.l + (n === 1 ? pw / 2 : (k / (n - 1)) * pw);
+  const Y = (v) => m.t + ((hi - v) / (hi - lo)) * ph;
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `累计盈亏：${n} 箱后为 ${yuanS(cum[n - 1])}` });
+  for (const v of yt) {
+    svg.append(s('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: v === 0 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': v === 0 ? 1.2 : 1 }));
+    const tx = s('text', { x: m.l - 8, y: Y(v) + 4, 'text-anchor': 'end' }); tx.textContent = yuanC(v); svg.append(tx);
+  }
+  const xt = niceTicks(1, n, Math.min(6, n)).filter((v) => v >= 1 && v <= n && Number.isInteger(v));
+  if (!xt.length || xt[0] !== 1) xt.unshift(1);
+  for (const v of xt) { const tx = s('text', { x: X(v - 1), y: H - 8, 'text-anchor': 'middle' }); tx.textContent = nf0.format(v); svg.append(tx); }
+  // expected line
+  svg.append(s('line', { x1: X(0), y1: Y(slope), x2: X(n - 1), y2: Y(slope * n), stroke: 'var(--ref)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }));
+  // actual line (bucketed min/max keeps every jump)
+  const bucket = Math.max(1, Math.ceil(n / 700));
+  let d = '';
+  for (let b = 0; b < n; b += bucket) {
+    const e = Math.min(n, b + bucket); let mi = b, ma = b;
+    for (let k = b; k < e; k++) { if (cum[k] < cum[mi]) mi = k; if (cum[k] > cum[ma]) ma = k; }
+    const pts = [...new Set([b, mi, ma, e - 1])].sort((p, q) => p - q);
+    for (const k of pts) d += (d ? 'L' : 'M') + X(k).toFixed(1) + ',' + Y(cum[k]).toFixed(1);
+  }
+  if (n === 1) d = `M${X(0) - 6},${Y(cum[0]).toFixed(1)}L${X(0) + 6},${Y(cum[0]).toFixed(1)}`;
+  svg.append(s('path', { d, fill: 'none', stroke: 'var(--series)', 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+  for (const g of st.golds) svg.append(s('circle', { cx: X(g), cy: Y(cum[g]), r: 4.5, fill: 'var(--r4)', stroke: 'var(--surface-2)', 'stroke-width': 2 }));
+  svg.append(s('circle', { cx: X(n - 1), cy: Y(cum[n - 1]), r: 4.5, fill: 'var(--series)', stroke: 'var(--surface-2)', 'stroke-width': 2 }));
+  const endLab = s('text', { x: Math.min(X(n - 1), W - m.r), y: Y(cum[n - 1]) + (cum[n - 1] > (hi + lo) / 2 ? 18 : -10), 'text-anchor': 'end', style: 'fill:var(--ink);font-weight:600;font-size:12px' });
+  endLab.textContent = yuanS(cum[n - 1]); svg.append(endLab);
+  // hover layer
+  const cross = s('line', { y1: m.t, y2: m.t + ph, stroke: 'var(--ink-3)', 'stroke-width': 1, visibility: 'hidden' });
+  const dot = s('circle', { r: 5, fill: 'var(--series)', stroke: 'var(--surface-2)', 'stroke-width': 2, visibility: 'hidden' });
+  const hit = s('rect', { x: m.l, y: m.t, width: pw, height: ph, fill: 'transparent', tabindex: '0', 'aria-label': '移动查看每一箱的累计盈亏' });
+  svg.append(cross, dot, hit);
+  box.append(svg);
+  let cur = n - 1;
+  const show = (k, cx, cy) => {
+    cur = Math.max(0, Math.min(n - 1, k));
+    const o = opens[cur], it = ITEMS[o.i];
+    cross.setAttribute('x1', X(cur)); cross.setAttribute('x2', X(cur)); cross.setAttribute('visibility', 'visible');
+    dot.setAttribute('cx', X(cur)); dot.setAttribute('cy', Y(cum[cur])); dot.setAttribute('visibility', 'visible');
+    const r = svg.getBoundingClientRect();
+    showTip(cx ?? r.left + (X(cur) / W) * r.width, cy ?? r.top + (Y(cum[cur]) / H) * r.height, [
+      h('div', { style: 'margin-bottom:3px', text: `第 ${nf0.format(cur + 1)} 箱` }),
+      tipRow(yuanS(cum[cur]), '实际累计', 'var(--series)'),
+      tipRow(yuanS(slope * (cur + 1)), '理论期望', 'var(--ref)'),
+      tipRow(yuan(st.vals[cur]), `本箱：${weaponZh(it)} | ${skinZh(it)}`)]);
+  };
+  const hide = () => { cross.setAttribute('visibility', 'hidden'); dot.setAttribute('visibility', 'hidden'); hideTip(); };
+  hit.addEventListener('pointermove', (e) => { const r = svg.getBoundingClientRect(); const x = (e.clientX - r.left) * (W / r.width); show(Math.round(((x - m.l) / pw) * (n - 1)), e.clientX, e.clientY); });
+  hit.addEventListener('pointerleave', hide);
+  hit.addEventListener('focus', () => show(cur));
+  hit.addEventListener('blur', hide);
+  hit.addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); show(cur + (e.key === 'ArrowLeft' ? -1 : 1) * Math.max(1, Math.round(n / 100))); } });
+  // table view (sampled)
+  const step = Math.max(1, Math.ceil(n / 40)), rows = [];
+  for (let k = step - 1; k < n; k += step) rows.push(k);
+  if (rows[rows.length - 1] !== n - 1) rows.push(n - 1);
+  tbl.append(h('table', null, h('thead', null, h('tr', null, h('th', { class: 'num', text: '箱数' }), h('th', { class: 'num', text: '实际累计盈亏' }), h('th', { class: 'num', text: '理论期望' }))),
+    h('tbody', null, rows.map((k) => h('tr', null, h('td', { class: 'num', text: nf0.format(k + 1) }), h('td', { class: 'num', text: yuanS(cum[k]) }), h('td', { class: 'num', text: yuanS(slope * (k + 1)) }))))));
+}
+
+/* Monte Carlo */
+const mcState = { running: false, result: null, n: 100, token: 0 };
+async function runMC() {
+  const token = ++mcState.token; mcState.running = true;
+  const n = settings.mcN || 100, trials = 2000, cost = costPer(), fm = feeMul(), src = settings.src;
+  $('#mcRun').disabled = true; $('#mcRun').textContent = '模拟中…';
+  const tables = ITEMS.map((it) => { let a = 0; const wc = it.wp.map((p) => (a += p)); const lastW = it.wp.reduce((m, p, k) => (p > 0 ? k : m), 0); for (let k = lastW; k < 5; k++) wc[k] = 1.0000001; return { wc, pr: it.price[src].map((p) => (p ? [p[0] * fm, p[1] * fm] : [0, 0])) }; });
+  const res = new Float64Array(trials);
+  const chunk = Math.max(1, Math.floor(40000 / n));
+  for (let t = 0; t < trials;) {
+    const end = Math.min(trials, t + chunk);
+    for (; t < end; t++) {
+      let sum = 0;
+      for (let k = 0; k < n; k++) {
+        const tb = tables[rollIndex()], r = rng(); let w = 0;
+        while (r >= tb.wc[w]) w++;
+        sum += tb.pr[w][rng() < ST_CHANCE ? 1 : 0];
+      }
+      res[t] = sum / (n * cost);
+    }
+    await new Promise((r) => setTimeout(r, 0));
+    if (token !== mcState.token) return;
+  }
+  const sorted = Array.from(res).sort((a, b) => a - b);
+  const q = (p) => sorted[Math.min(trials - 1, Math.floor(p * trials))];
+  mcState.result = { n, trials, sorted, mean: sorted.reduce((a, b) => a + b, 0) / trials, median: q(0.5), p10: q(0.1), p90: q(0.9), win: sorted.filter((v) => v >= 1).length / trials, best: sorted[trials - 1], cost };
+  mcState.running = false;
+  $('#mcRun').disabled = false; $('#mcRun').textContent = '重新模拟';
+  if (ui.tab === 'stats') renderMC();
+}
+function renderMC() {
+  const R = mcState.result; if (!R) return;
+  const sum = $('#mcSummary'); sum.textContent = '';
+  const f = (lab, val, sub, cls) => h('div', { class: 'fact' }, h('div', { class: 'lab', text: lab }), h('div', { class: 'val' + (cls ? ' ' + cls : ''), text: val }), h('div', { class: 'sub', text: sub }));
+  sum.append(
+    f('最终盈利的玩家', pct(R.win, 1), `${nf0.format(Math.round(R.win * R.trials))} / ${nf0.format(R.trials)} 人`, R.win >= 0.5 ? 'good' : 'bad'),
+    f('中位回报', pct(R.median, 0), `一半玩家拿回不到 ${yuanC(R.median * R.n * R.cost)}`),
+    f('平均回报', pct(R.mean, 0), `理论值 ${pct(stats().ev.ev / costPer(), 0)}`),
+    f('最幸运的玩家', pct(R.best, 0), `花 ${yuanC(R.n * R.cost)} 开出 ${yuanC(R.best * R.n * R.cost)}`));
+  const box = $('#mcChart'); box.textContent = '';
+  const W = Math.max(300, box.clientWidth || 600), H = W < 520 ? 200 : 230, m = { l: 44, r: 16, t: 12, b: 30 };
+  const upper = Math.max(1.25, Math.ceil(Math.min(R.sorted[Math.floor(R.trials * 0.97)], 6) * 4) / 4);
+  const B = 30, bw = upper / B, bins = new Array(B).fill(0);
+  let over = 0;
+  for (const v of R.sorted) { const b = Math.floor(v / bw); if (b >= B) { bins[B - 1]++; over++; } else bins[b]++; }
+  const maxC = Math.max(...bins), yt = niceTicks(0, maxC, 4);
+  const pw = W - m.l - m.r, ph = H - m.t - m.b, cw = pw / B;
+  const X = (v) => m.l + (v / upper) * pw, Y = (c) => m.t + ph - (c / yt[yt.length - 1]) * ph;
+  const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `每人开 ${R.n} 箱的回报分布，盈利概率 ${pct(R.win, 1)}` });
+  for (const v of yt) { svg.append(s('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: v === 0 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 })); const tx = s('text', { x: m.l - 6, y: Y(v) + 4, 'text-anchor': 'end' }); tx.textContent = nf0.format(v); svg.append(tx); }
+  const barW = Math.min(24, cw - 2);
+  bins.forEach((c, b) => {
+    if (!c) return;
+    const x = m.l + b * cw + (cw - barW) / 2, y = Y(c), hgt = m.t + ph - y, r = Math.min(4, barW / 2, hgt);
+    const p = s('path', { d: `M${x},${m.t + ph}V${y + r}Q${x},${y} ${x + r},${y}H${x + barW - r}Q${x + barW},${y} ${x + barW},${y + r}V${m.t + ph}Z`, fill: 'var(--series)' });
+    const g = s('g', { tabindex: '0' }); g.append(p, s('rect', { x: m.l + b * cw, y: m.t, width: cw, height: ph, fill: 'transparent' }));
+    bindTip(g, () => [tipRow(`${nf0.format(c)} 人`, b === B - 1 && over ? `回报 ≥ ${pct(b * bw, 0)}` : `回报 ${pct(b * bw, 0)} – ${pct((b + 1) * bw, 0)}`), tipRow(pct(c / R.trials, 1), '占全部玩家')]);
+    g.addEventListener('pointerenter', () => p.setAttribute('fill', '#5a9cf0')); g.addEventListener('pointerleave', () => p.setAttribute('fill', 'var(--series)'));
+    svg.append(g);
+  });
+  const xt = niceTicks(0, upper, 5).filter((v) => v <= upper + 1e-9);
+  for (const v of xt) { const last = Math.abs(v - upper) < 1e-9; const tx = s('text', { x: X(v), y: H - 10, 'text-anchor': last ? 'end' : 'middle' }); tx.textContent = pct(v, 0) + (last && over ? '+' : ''); svg.append(tx); }
+  const be = s('line', { x1: X(1), x2: X(1), y1: m.t - 2, y2: m.t + ph, stroke: 'var(--ink)', 'stroke-width': 1.5 });
+  const md = s('line', { x1: X(Math.min(R.median, upper)), x2: X(Math.min(R.median, upper)), y1: m.t - 2, y2: m.t + ph, stroke: 'var(--ref)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' });
+  const lb = s('text', { x: X(1) + 5, y: m.t + 10, style: 'fill:var(--ink);font-size:11px' }); lb.textContent = '回本';
+  svg.append(be, md, lb);
+  box.append(svg);
+  const tb = $('#mcTable'); tb.textContent = '';
+  tb.append(h('table', null, h('thead', null, h('tr', null, h('th', { text: '回报区间' }), h('th', { class: 'num', text: '人数' }), h('th', { class: 'num', text: '占比' }))),
+    h('tbody', null, bins.map((c, b) => h('tr', null, h('td', { class: 'num', style: 'text-align:left', text: b === B - 1 ? `≥ ${pct(b * bw, 0)}` : `${pct(b * bw, 0)} – ${pct((b + 1) * bw, 0)}` }), h('td', { class: 'num', text: nf0.format(c) }), h('td', { class: 'num', text: pct(c / R.trials, 1) }))))));
+}
+
+/* tooltip */
+function tipRow(val, lab, color) { return h('div', { class: 'tr' }, color ? h('i', { class: 'k', style: `background:${color}` }) : null, h('b', { text: val }), h('span', { text: lab })); }
+function showTip(x, y, rows) {
+  tip.textContent = ''; rows.forEach((r) => tip.append(r)); tip.hidden = false;
+  const r = tip.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+  let left = x + 14, top = y + 14;
+  if (left + r.width > vw - 8) left = x - r.width - 14;
+  if (top + r.height > vh - 8) top = y - r.height - 14;
+  tip.style.left = Math.max(8, left) + 'px'; tip.style.top = Math.max(8, top) + 'px';
+}
+function hideTip() { tip.hidden = true; }
+function bindTip(el, rowsFn) {
+  el.addEventListener('pointermove', (e) => showTip(e.clientX, e.clientY, rowsFn()));
+  el.addEventListener('pointerleave', hideTip);
+  el.addEventListener('focus', () => { const r = el.getBoundingClientRect(); showTip(r.left + r.width / 2, r.top, rowsFn()); });
+  el.addEventListener('blur', hideTip);
+}
+
+/* ================= inventory ================= */
+function invCard(o) {
+  const it = ITEMS[o.i], w = wearOf(o.f);
+  return h('button', { class: 'inv-card r' + it.tier, type: 'button', title: marketZh(it, o.st, w), onclick: () => showReveal(o, true) },
+    o.st ? h('span', { class: 'st-tag', text: 'StatTrak™' }) : null,
+    h('div', { class: 'inv-img' }, lazyImg(it.img, '')),
+    h('div', { class: 'inv-meta' }, h('b', { text: `${weaponZh(it)} | ${skinZh(it)}` }), h('span', { text: `${WEARS[w].zh} · ${o.f.toFixed(4)}` }), h('span', { class: 'pr', text: yuan(valueOf(o)) })));
+}
+function renderInv() {
+  const s = stats();
+  const chips = $('#invChips'); chips.textContent = '';
+  const chip = (val, label, count, tier) => h('button', { class: 'chip' + (tier != null ? ' r' + tier : ''), type: 'button', 'aria-pressed': String(ui.invFilter === val), onclick: () => { ui.invFilter = val; ui.invShown = 120; renderInv(); } },
+    tier != null ? h('span', { class: 'swatch' }) : null, label, h('span', { class: 'num muted', text: nf0.format(count) }));
+  chips.append(chip(-1, '全部', s.n), ...TIERS.map((t, k) => chip(k, k === 4 ? '★ 刀' : t.zh, s.tierCount[k], k)));
+  let list = opens.map((o, k) => ({ o, k, v: s.vals[k] }));
+  if (ui.invFilter >= 0) list = list.filter((x) => ITEMS[x.o.i].tier === ui.invFilter);
+  if (ui.invST) list = list.filter((x) => x.o.st);
+  const sorters = { new: (a, b) => b.k - a.k, value: (a, b) => b.v - a.v, rarity: (a, b) => ITEMS[b.o.i].tier - ITEMS[a.o.i].tier || b.v - a.v, float: (a, b) => a.o.f - b.o.f };
+  list.sort(sorters[ui.invSort]);
+  const total = list.reduce((a, x) => a + x.v, 0);
+  $('#invSum').textContent = `共 ${nf0.format(list.length)} 件 · 总价值 ${yuan(total)}`;
+  const grid = $('#invGrid'); grid.textContent = '';
+  if (!list.length) grid.append(h('div', { class: 'empty', style: 'grid-column:1/-1', text: opens.length ? '没有符合筛选条件的物品。' : '库存是空的。开箱获得的每一件物品都会出现在这里。' }));
+  list.slice(0, ui.invShown).forEach((x) => grid.append(invCard(x.o)));
+  const more = $('#invMore'); more.textContent = '';
+  if (list.length > ui.invShown) more.append(h('button', { class: 'btn-plain', type: 'button', text: `再显示 ${Math.min(240, list.length - ui.invShown)} 件（还剩 ${nf0.format(list.length - ui.invShown)} 件）`, onclick: () => { ui.invShown += 240; renderInv(); } }));
+}
+
+/* ================= odds ================= */
+function renderOdds() {
+  const tt = $('#tierTable'); tt.textContent = '';
+  const ev = evInfo();
+  tt.append(h('thead', null, h('tr', null, h('th', { text: '稀有度' }), h('th', { class: 'num', text: '物品数' }), h('th', { class: 'num', text: '档位概率' }), h('th', { class: 'num', text: '单件概率' }), h('th', { class: 'num', text: '约每 N 箱出 1 件' }), h('th', { class: 'num', text: '档位平均价值' }))),
+    h('tbody', null, TIERS.map((t, k) => {
+      const cnt = k === 4 ? 30 : POOLS[k].idx.length;
+      return h('tr', { class: 'r' + k }, h('td', null, h('span', { class: 'swatch' }), k === 4 ? '★ 罕见特殊物品' : t.zh),
+        h('td', { class: 'num', text: k === 4 ? '30（含相位 50）' : cnt }), h('td', { class: 'num', text: pct(t.p, 2) }), h('td', { class: 'num', text: pctP(t.p / cnt) }),
+        h('td', { class: 'num', text: 1 / t.p < 10 ? (1 / t.p).toFixed(2) : nf0.format(Math.round(1 / t.p)) }), h('td', { class: 'num', text: yuan(ev.avg[k]) }));
+    })));
+  const st = ui.oddsST ? 1 : 0;
+  $('#weaponDesc').textContent = `参考价为${SRC_NAME[settings.src]}${settings.fee ? '到手价' : '价格'}（${META.priceDate}），“估”表示缺少成交数据、按相邻磨损或另一平台估算。`;
+  const head = h('thead', null, h('tr', null, h('th', { text: '物品' }), h('th', { class: 'num', text: '单件概率' }), h('th', { text: '磨损区间' }), ...WEARS.map((w) => h('th', { class: 'num', text: w.short }))));
+  const frange = (it) => h('div', { title: `${it.min.toFixed(2)} – ${it.max.toFixed(2)}`, style: 'display:flex;align-items:center;gap:8px' }, h('div', { class: 'frange' }, h('i', { style: `left:${it.min * 100}%;width:${(it.max - it.min) * 100}%` })), h('span', { class: 'num muted', text: `${it.min.toFixed(2)}–${it.max.toFixed(2)}` }));
+  const itemCell = (it, sub) => h('td', null, h('div', { class: 'odds-item' }, lazyImg(it.img, ''), h('div', { class: 'nm' }, h('b', { text: `${weaponZh(it)} | ${skinZh(it)}` }), h('span', null, h('span', { class: 'swatch r' + it.tier, style: 'margin-right:4px' }), sub))));
+  const wt = $('#weaponTable'); wt.textContent = '';
+  const weapons = ITEMS.filter((it) => it.tier < 4).sort((a, b) => b.tier - a.tier || a.id - b.id);
+  wt.append(head, h('tbody', null, weapons.map((it) => h('tr', { style: 'cursor:pointer', onclick: () => openItemModal(it.id) }, itemCell(it, `${TIERS[it.tier].zh} ${typeZh(it)}`), h('td', { class: 'num', text: pctP(it.p) }), h('td', null, frange(it)), ...priceCells(it, st)))));
+  const kt = $('#knifeTable'); kt.textContent = '';
+  const rows = [];
+  for (const kn of KNIVES) {
+    const list = ITEMS.filter((it) => it.tier === 4 && it.knife === kn);
+    rows.push(h('tr', { class: 'knife-head' }, h('td', { colspan: 8, text: `★ ${list[0].wz} · ${list[0].we}` })));
+    for (const it of list) rows.push(h('tr', { style: 'cursor:pointer', onclick: () => openItemModal(it.id) }, itemCell(it, it.ph ? `伽玛多普勒相位 · ${it.phe}` : it.se), h('td', { class: 'num', text: `${pctP(it.p)}` }), h('td', null, frange(it)), ...priceCells(it, st)));
+  }
+  kt.append(head.cloneNode(true), h('tbody', null, rows));
+  const notes = $('#oddsNotes'); notes.textContent = '';
+  const pw = META.phaseWeight;
+  [
+    ['档位概率', '军规级 79.92%、受限级 15.98%、保密级 3.20%、隐秘级 0.64%、罕见特殊物品 0.26%，来自 Valve 面向中国大陆的公示。'],
+    ['档位内', '同一档位内每件物品概率相同；刀池先等概率选 5 种刀型之一，再等概率选 6 种涂装之一。'],
+    ['伽玛多普勒相位', `Valve 未公布相位概率。这里采用社区估计：P1–P4 各 ${pct(pw.p1, 2)}，绿宝石 ${pct(pw.emerald, 0)}。`],
+    ['StatTrak™', '任意物品均有 10% 概率为 StatTrak™ 版本（刀为 ★ StatTrak™）。'],
+    ['磨损', '先按 3% / 24% / 33% / 24% / 16% 抽取磨损区段，在区段内均匀取值，再映射到该皮肤自己的磨损区间。所以伽玛多普勒（0.00–0.08）约 96% 为崭新出厂。'],
+    ['图案模板', '0–1000 随机整数，影响图案位置，本模拟不按模板单独定价。'],
+    ['武器箱信息', '梦魇武器箱（crate_community_30，系列 #339），2022 年 1 月随“梦魇”创意工坊比赛作品推出，钥匙不可交易。'],
+  ].forEach(([b, t]) => notes.append(h('li', null, h('b', { text: b + '：' }), t)));
+}
+
+/* ================= settings ================= */
+function renderSettings() {
+  $('#srcBuff').checked = settings.src === 'buff'; $('#srcSteam').checked = settings.src === 'steam';
+  $('#srcHint').textContent = `口径会同时决定武器箱默认价格（BUFF ${yuan(META.casePrice.buff)} / Steam ${yuan(META.casePrice.steam)}）和所有出货的估值。价格快照：${META.priceDate}，汇率 1 美元 = ${META.fx} 元。`;
+  if (document.activeElement !== $('#keyPrice')) $('#keyPrice').value = settings.key.toFixed(2);
+  if (document.activeElement !== $('#casePrice')) $('#casePrice').value = casePrice().toFixed(2);
+  $('#feeToggle').checked = settings.fee;
+  $('#speedNormal').checked = settings.speed !== 'fast'; $('#speedFast').checked = settings.speed === 'fast';
+  skipToggle.checked = skipToggle2.checked = settings.skip;
+  $('#dataHint').textContent = `已保存 ${nf0.format(opens.length)} 次开箱记录，只存在这台设备的浏览器里，最多保留最近 ${nf0.format(MAX_LOG)} 次。`;
+  $('#sourceHint').textContent = `箱子内容、名称与磨损区间来自 CS2 游戏数据（items_game）；价格来自 Steam 社区市场与 BUFF 的公开价格快照（${META.priceDate}），按 1 美元 = ${META.fx} 元换算；贴图来自 Steam 社区市场。`;
+}
+function setSetting(k, v) { settings[k] = v; scheduleSave(); if (['src', 'key', 'casePrice', 'fee'].includes(k)) { mcState.result = null; mcState.token++; mcState.running = false; } refreshAll(); }
+
+/* ================= tabs ================= */
+const TABS = ['stats', 'inv', 'odds', 'cost'];
+function selectTab(name, focus) {
+  ui.tab = name;
+  for (const t of TABS) {
+    const b = $('#tab-' + t), p = $('#panel-' + t), on = t === name;
+    b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; p.hidden = !on;
+  }
+  if (focus) $('#tab-' + name).focus();
+  refreshAll();
+}
+
+/* ================= toast ================= */
+let toastTimer = 0;
+function toast(msg) { toastEl.textContent = msg; toastEl.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (toastEl.hidden = true), 2600); }
+
+/* ================= events ================= */
+function bind() {
+  openBtn.addEventListener('click', openCase);
+  skipBtn.addEventListener('click', () => Spin.finish && Spin.finish());
+  qtySel.addEventListener('change', () => { settings.qty = +qtySel.value; scheduleSave(); openBtn.textContent = settings.qty > 1 ? `解锁 ${settings.qty} 个` : '解锁容器'; });
+  const onSkip = (e) => { setSetting('skip', e.target.checked); };
+  skipToggle.addEventListener('change', onSkip); skipToggle2.addEventListener('change', onSkip);
+  $('#soundBtn').addEventListener('click', (e) => { settings.sound = !settings.sound; e.currentTarget.setAttribute('aria-pressed', String(settings.sound)); scheduleSave(); if (settings.sound) Snd.init(); toast(settings.sound ? '音效已开启' : '音效已关闭'); });
+  $('#inspectAll').addEventListener('click', () => { selectTab('odds'); $('.desk').scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' }); });
+  $('#rvClose').addEventListener('click', () => closeReveal(false));
+  $('#rvAgain').addEventListener('click', () => closeReveal(true));
+  rv.querySelector('[data-close]').addEventListener('click', () => closeReveal(false));
+  modal.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeModal(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { if (!rv.hidden) closeReveal(false); else if (!modal.hidden) closeModal(); return; }
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (e.key === ' ' && Spin.running && tag !== 'input' && tag !== 'select') { e.preventDefault(); Spin.finish(); }
+  });
+  for (const t of TABS) $('#tab-' + t).addEventListener('click', () => selectTab(t));
+  $('.tabs').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const i = TABS.indexOf(ui.tab), j = (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length;
+    e.preventDefault(); selectTab(TABS[j], true);
+  });
+  $('#mcSeg').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-n]'); if (!b) return;
+    settings.mcN = +b.dataset.n; scheduleSave();
+    for (const x of $('#mcSeg').querySelectorAll('button')) x.setAttribute('aria-pressed', String(x === b));
+    mcState.result = null; runMC();
+  });
+  $('#mcRun').addEventListener('click', () => { mcState.result = null; runMC(); });
+  $('#invSort').addEventListener('change', (e) => { ui.invSort = e.target.value; renderInv(); });
+  $('#invST').addEventListener('change', (e) => { ui.invST = e.target.checked; ui.invShown = 120; renderInv(); });
+  $('#oddsST').addEventListener('change', (e) => { ui.oddsST = e.target.checked; renderOdds(); });
+  for (const r of document.querySelectorAll('input[name="src"]')) r.addEventListener('change', (e) => { setSetting('src', e.target.value); toast(`已切换为 ${SRC_NAME[e.target.value]} 价格口径`); });
+  for (const r of document.querySelectorAll('input[name="speed"]')) r.addEventListener('change', (e) => setSetting('speed', e.target.value));
+  const money = (el, key) => el.addEventListener('change', () => {
+    const v = parseFloat(el.value);
+    if (!isFinite(v) || v < 0) { el.value = (key === 'key' ? settings.key : casePrice()).toFixed(2); toast('请输入不小于 0 的金额'); return; }
+    setSetting(key, Math.round(v * 100) / 100);
+  });
+  money($('#keyPrice'), 'key'); money($('#casePrice'), 'casePrice');
+  $('#caseReset').addEventListener('click', () => { setSetting('casePrice', null); toast('武器箱价格已恢复为口径默认值'); });
+  $('#feeToggle').addEventListener('change', (e) => setSetting('fee', e.target.checked));
+  let armTimer = 0;
+  $('#resetBtn').addEventListener('click', (e) => {
+    const b = e.currentTarget;
+    if (!b.classList.contains('armed')) { b.classList.add('armed'); b.textContent = '再点一次确认清空'; clearTimeout(armTimer); armTimer = setTimeout(() => { b.classList.remove('armed'); b.textContent = '清空全部记录'; }, 4000); return; }
+    clearTimeout(armTimer); b.classList.remove('armed'); b.textContent = '清空全部记录';
+    opens = []; saveNow(); mcState.result = null; refreshAll(); toast('已清空全部开箱记录');
+  });
+  let rz = 0;
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (ui.tab === 'stats') { renderPL(stats()); renderMC(); } }, 150); });
+}
+
+/* ================= boot ================= */
+function start(hot) {
+  const saved = (hot && hot.opens) ? hot : loadStore();
+  if (saved) {
+    if (saved.settings && typeof saved.settings === 'object') settings = { ...DEFAULTS, ...saved.settings };
+    opens = Array.isArray(saved.opens) && saved.opens.length && !Array.isArray(saved.opens[0]) ? saved.opens.filter((o) => ITEMS[o.i]) : unpackOpens(saved.opens);
+  } else if (reducedMotion) settings.skip = true;
+  if (!['buff', 'steam'].includes(settings.src)) settings.src = 'buff';
+  if (!isFinite(settings.key)) settings.key = DEFAULTS.key;
+  qtySel.value = String(settings.qty || 1);
+  if (!qtySel.value) { qtySel.value = '1'; settings.qty = 1; }
+  openBtn.textContent = settings.qty > 1 ? `解锁 ${settings.qty} 个` : '解锁容器';
+  $('#soundBtn').setAttribute('aria-pressed', String(settings.sound));
+  for (const x of $('#mcSeg').querySelectorAll('button')) x.setAttribute('aria-pressed', String(+x.dataset.n === settings.mcN));
+  renderGrid();
+  bind();
+  selectTab('stats');
+  renderSettings();
+}
+const HOT = window.claude && window.claude.hot;
+if (HOT && typeof HOT.snapshot === 'function') { try { HOT.snapshot(() => ({ settings, opens })); } catch (e) { /* optional */ } }
+if (HOT && typeof HOT.ready === 'function') HOT.ready(start); else start((HOT && HOT.data) || null);
+})();
+</script>
