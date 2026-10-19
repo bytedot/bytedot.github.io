@@ -6,11 +6,9 @@ draft: false
 author: "bztg"
 categories: ["BZTG.ORG"]
 tags: ["AI"]
-summary: "6.1 Sol 和 Sonnet 5.5，GPT…拉完了。。都是相同提示词直出"
+summary: "瓶中船 6.1 Sol、Sonnet 5.5、Opus 5.5；Opus 5.5 池核；Opus 5.5 梦魇开箱模拟器"
 ---
 
-<a href="https://bztg.org/vcw/261014-61sol/" target="_blank" rel="noopener noreferrer">6.1 Sol</a> 和 <a href="https://bztg.org/vcw/261014-snt55/" target="_blank" rel="noopener noreferrer">Sonnet 5.5</a>，GPT…拉完了。。都是相同提示词直出
-
-<span class="spoiler" tabindex="0">不过其实Sonnet 5.5的写完有个bug，用Astra修了一下hhhh</span>
-
-又让<a href="https://bztg.org/vcw/261015-opus55/" target="_blank" rel="noopener noreferrer">Opus 5.5</a>做了一份，就也还行吧
+瓶中船 <a href="https://bztg.org/vcw/261014-61sol/" target="_blank" rel="noopener noreferrer">6.1 Sol</a>&nbsp;&nbsp;&nbsp;<a href="https://bztg.org/vcw/261014-snt55/" target="_blank" rel="noopener noreferrer">Sonnet 5.5</a>&nbsp;&nbsp;&nbsp;<a href="https://bztg.org/vcw/261015-opus55/" target="_blank" rel="noopener noreferrer">Opus 5.5</a><br>
+Opus 5.5 <a href="https://bztg.org/vcw/poolrooms-opus55" target="_blank" rel="noopener noreferrer">池核</a><br>
+Opus 5.5 <a href="https://bztg.org/vcw/csopnsmlt" target="_blank" rel="noopener noreferrer">梦魇开箱模拟器</a>
