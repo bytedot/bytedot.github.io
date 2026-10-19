@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>彭罗斯房间</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@700&display=swap">
+<style>
+/* 布局：暗室实验台。房间画布是台面，右侧一张仪器卡片；窄屏时卡片落到画布下方。
+   刻意只做暗色：这是一个关于光和黑暗的演示。 */
+:root{
+  --ink:#0a0d17;      /* 页面底色 */
+  --plate:#0d1121;    /* 台面（房间外的实体） */
+  --floor:#172039;    /* 房间地面 */
+  --panel:#121729;
+  --rule:#232b45;
+  --fg:#ece7da;
+  --muted:#9097ab;
+  --mirror:#d3dcee;   /* 镜面墙 */
+  --lamp:#ffb44d;     /* 光 */
+  --spark:#fff1d2;    /* 光子 */
+  --focus:#bb8dff;    /* 椭圆焦点 */
+  --shade:#8f99c2;    /* 理论暗区阴影线 */
+  --hint-bg:rgba(10,13,23,.78);
+  --font-display:"Noto Serif SC","Songti SC","STSong","SimSun",serif;
+  --font-body:"Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
+  color-scheme:dark;
+}
+html,body{background:var(--ink);color:var(--fg)}
+body{
+  font-family:var(--font-body);font-size:14px;line-height:1.65;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:18px 32px;
+}
+.wrap{max-width:1320px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+
+.masthead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:8px 40px;padding-bottom:14px;border-bottom:1px solid var(--rule)}
+.eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;color:var(--lamp);margin:0 0 6px}
+h1{font-family:var(--font-display);font-weight:700;font-size:clamp(30px,4.2vw,44px);line-height:1.05;letter-spacing:.08em;margin:0;text-wrap:balance}
+.lede{margin:0;max-width:34em;color:var(--muted);text-wrap:pretty}
+
+.bench{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;align-items:start}
+@media (max-width:880px){.bench{grid-template-columns:minmax(0,1fr)}}
+
+.stage{min-width:0;display:flex;justify-content:center}
+.frame{position:relative;background:var(--plate);border:1px solid var(--rule);border-radius:12px;padding:10px;max-width:100%}
+#view{display:block;touch-action:none;cursor:crosshair;max-width:100%}
+#view.outside{cursor:not-allowed}
+.hint{
+  position:absolute;left:20px;top:18px;margin:0;pointer-events:none;
+  font-size:12px;color:var(--fg);background:var(--hint-bg);
+  border:1px solid var(--rule);border-radius:999px;padding:3px 12px;
+}
+.hint.warn{color:var(--lamp);border-color:var(--lamp)}
+
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:12px;padding:16px;display:flex;flex-direction:column;min-width:0}
+.panel > section{display:flex;flex-direction:column;gap:10px;padding-block:14px;border-top:1px solid var(--rule)}
+.panel > section:first-child{padding-top:0;border-top:0}
+.panel > section:last-child{padding-bottom:0}
+.label{margin:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;color:var(--muted)}
+.label label{cursor:pointer}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+.status{font-size:11px;letter-spacing:.06em;padding:0 9px;border-radius:999px;border:1px solid var(--rule);color:var(--muted)}
+.status[data-state="run"]{color:var(--lamp);border-color:var(--lamp)}
+.status[data-state="done"]{color:var(--fg);border-color:var(--muted)}
+
+.where{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.where strong{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:.06em}
+.where span{color:var(--muted);font-size:12px}
+.dark-summary{margin:0;font-size:13px}
+.dark-summary b{color:var(--shade);font-weight:500}
+.why-now{margin:0;color:var(--muted);font-size:13px}
+
+.meter{display:flex;flex-direction:column;gap:5px}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px}
+.row .mono{font-size:12px;color:var(--muted)}
+.row .mono b{color:var(--fg);font-weight:500}
+.bar{position:relative;height:6px;background:var(--rule);border-radius:3px;overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--lamp);border-radius:3px}
+.bar s{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:var(--fg);left:100%}
+
+input[type="range"]{width:100%;margin:2px 0 0;accent-color:var(--lamp)}
+.ticks{display:flex;justify-content:space-between;padding-inline:4px;font-size:11px;color:var(--muted);margin-top:-6px}
+output{font-size:13px;color:var(--fg);letter-spacing:0}
+.note{margin:0;font-size:12px;color:var(--muted)}
+
+.buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.btn{font:inherit;font-size:13px;color:var(--fg);background:transparent;border:1px solid var(--rule);border-radius:8px;padding:7px 6px;cursor:pointer;white-space:nowrap}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn.primary{color:var(--lamp);border-color:var(--lamp)}
+.btn:disabled{opacity:.4;cursor:default}
+
+fieldset.seg{margin:0;min-width:0;border:1px solid var(--rule);border-radius:8px;padding:3px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px}
+.seg legend{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{text-align:center;padding:5px 0;border-radius:6px;font-family:var(--font-mono);font-size:13px;color:var(--muted);cursor:pointer}
+.seg input:checked + label{background:var(--rule);color:var(--fg)}
+.seg input:focus-visible + label{outline:2px solid var(--lamp);outline-offset:1px}
+
+.presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+
+.check{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px}
+.check input{accent-color:var(--lamp);width:15px;height:15px;margin:0;flex:none}
+.sw{flex:none;width:20px;height:12px;display:inline-flex;align-items:center;justify-content:center}
+.sw-focus::before{content:"";width:20px;border-top:1.5px dashed var(--focus)}
+.sw-shade{border:1px dashed var(--shade);background:repeating-linear-gradient(135deg,var(--shade) 0 1px,transparent 1px 4px)}
+.sw-lamp::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--spark);box-shadow:0 0 6px 1px var(--lamp)}
+
+.why p{margin:0;font-size:13px;text-wrap:pretty}
+.why .fine{color:var(--muted);font-size:12px}
+.why a{color:var(--lamp);text-underline-offset:2px}
+
+:focus-visible{outline:2px solid var(--lamp);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">照明问题 · R. PENROSE 1958</p>
+      <h1>彭罗斯房间</h1>
+    </div>
+    <p class="lede">在房间里任意一处点一下，放下一盏点光源。所有墙壁都是镜子，光会一直反射下去，可总有一些地方永远是黑的。</p>
+  </header>
+
+  <main class="bench">
+    <div class="stage" id="stage">
+      <div class="frame" id="frame">
+        <canvas id="view" role="img" aria-label="彭罗斯房间光线模拟。点击或拖动以放置光源。"></canvas>
+        <p class="hint" id="hint">点击或拖动，在房间内放置光源</p>
+      </div>
+    </div>
+
+    <aside class="panel" aria-label="控制面板">
+      <section>
+        <p class="label"><span>光源</span><span class="status mono" id="status" data-state="run">运行中</span></p>
+        <div class="where"><strong id="regionName">中央区</strong><span class="mono" id="coords">(0.0, 0.0)</span></div>
+        <p class="dark-summary">理论暗区：<b id="darkSummary">四个侧袋</b></p>
+        <p class="why-now" id="whyNow"></p>
+        <div class="meter">
+          <div class="row"><span>光程</span><span class="mono" id="pathText">0 / 1600</span></div>
+          <div class="bar"><i id="pathBar"></i></div>
+        </div>
+        <div class="meter">
+          <div class="row"><span>已照亮面积</span><span class="mono"><b id="litNow">0.0%</b> · 理论上限 <span id="litMax">94.1%</span></span></div>
+          <div class="bar"><i id="litBar"></i><s id="litCap"></s></div>
+        </div>
+        <div class="row"><span>平均反射次数</span><span class="mono" id="bounces">0.0</span></div>
+      </section>
+
+      <section>
+        <p class="label"><label for="speed">演示速度</label><output class="mono" id="speedOut" for="speed">1.00×</output></p>
+        <input type="range" id="speed" min="0" max="5" step="0.05" value="1">
+        <div class="ticks mono" aria-hidden="true"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5×</span></div>
+        <p class="note">线性刻度。1× 时光每秒前进半个房间宽，空格键暂停或继续。</p>
+        <div class="buttons">
+          <button type="button" class="btn primary" id="pauseBtn">暂停</button>
+          <button type="button" class="btn" id="replayBtn">重新播放</button>
+          <button type="button" class="btn" id="skipBtn">直接看结果</button>
+        </div>
+      </section>
+
+      <section>
+        <p class="label"><span>光线数量</span></p>
+        <fieldset class="seg">
+          <legend>光线数量</legend>
+          <input type="radio" name="rays" id="rays720" value="720"><label for="rays720">720</label>
+          <input type="radio" name="rays" id="rays1800" value="1800" checked><label for="rays1800">1800</label>
+          <input type="radio" name="rays" id="rays3600" value="3600"><label for="rays3600">3600</label>
+        </fieldset>
+      </section>
+
+      <section>
+        <p class="label"><span>试试这些位置</span></p>
+        <div class="presets">
+          <button type="button" class="btn" data-x="0" data-y="0">中央区</button>
+          <button type="button" class="btn" data-x="0" data-y="-25">上穹顶</button>
+          <button type="button" class="btn" data-x="-45" data-y="-7">左上侧袋</button>
+        </div>
+      </section>
+
+      <section>
+        <p class="label"><span>显示</span></p>
+        <label class="check"><input type="checkbox" id="showFoci" checked><span class="sw sw-focus"></span>椭圆焦点与长轴</label>
+        <label class="check"><input type="checkbox" id="showTheory"><span class="sw sw-shade"></span>理论暗区</label>
+        <label class="check"><input type="checkbox" id="showHeads" checked><span class="sw sw-lamp"></span>光子波前</label>
+      </section>
+
+      <section class="why">
+        <p class="label"><span>为什么总有照不到的地方</span></p>
+        <p>上下两个穹顶各是半个椭圆，紫色十字是椭圆的焦点。椭圆镜有一条性质：光线从两焦点之间穿过长轴，反射后还会从两焦点之间穿过；从焦点外侧穿过，反射后仍在外侧。</p>
+        <p>中央区的开口恰好是两焦点之间那一段，四个侧袋的开口都在焦点外侧，两侧的蘑菇形墙把它们隔开。光只能停留在自己那一类路径上，所以不论单个点光源放在哪里，房间里总有一部分是黑的。</p>
+        <p class="fine">罗杰·彭罗斯在 1958 年给出这个构造。尺寸参照维基百科示意图：穹顶半长轴 50、半短轴 30，两焦点相距 80。<a href="https://en.wikipedia.org/wiki/Illumination_problem" target="_blank" rel="noopener">Illumination problem</a></p>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------------- 几何（世界坐标，y 轴向下） ----------------
+  const A = 50, B = 30, C = Math.sqrt(A * A - B * B); // 穹顶半椭圆，焦点在 (±C, ±H)
+  const H = 12;            // 中间带半高
+  const STEM = 2;          // 蘑菇柄半高
+  const SX = 6, SY = H;    // 蘑菇头：小半椭圆
+  const WX0 = -52, WX1 = 52, WY0 = -(H + B) - 2, WY1 = H + B + 2;
+  const WW = WX1 - WX0, WH = WY1 - WY0;
+  const L_MAX = 1600;      // 每条光线的总光程
+  const BASE_SPEED = 50;   // 1× 时每秒前进的长度（半个房间宽）
+  const EPS = 1e-6;
+
+  const AREA = { dome: Math.PI * A * B / 2, center: 2 * C * 2 * H - Math.PI * SX * SY, pocket: (A - C) * (H - STEM) };
+  AREA.total = 2 * AREA.dome + AREA.center + 4 * AREA.pocket;
+
+  // 墙：k=0 线段；k=1 半椭圆弧（只保留 sign*(坐标-中心) >= 0 的一半）
+  const walls = [];
+  const seg = (x1, y1, x2, y2) => walls.push({ k: 0, x1, y1, x2, y2 });
+  const arc = (cx, cy, rx, ry, axisY, sign) => walls.push({ k: 1, cx, cy, rx, ry, axisY, sign });
+  arc(0, -H, A, B, true, -1);   // 上穹顶
+  arc(0, H, A, B, true, 1);     // 下穹顶
+  arc(C, 0, SX, SY, false, -1); // 右侧蘑菇头，向中央凸出
+  arc(-C, 0, SX, SY, false, 1); // 左侧蘑菇头
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    seg(sx * A, sy * H, sx * A, sy * STEM);    // 侧袋外墙
+    seg(sx * A, sy * STEM, sx * C, sy * STEM); // 蘑菇柄
+    seg(sx * C, sy * STEM, sx * C, sy * H);    // 侧袋内墙
+  }
+
+  function inRoom(x, y) {
+    if (y <= -H) { const u = x / A, v = (y + H) / B; return u * u + v * v <= 1; }
+    if (y >= H) { const u = x / A, v = (y - H) / B; return u * u + v * v <= 1; }
+    const ax = Math.abs(x);
+    if (ax <= C) { const u = (ax - C) / SX, v = y / SY; return u * u + v * v >= 1; }
+    return ax <= A && Math.abs(y) >= STEM;
+  }
+  const canPlace = (x, y) => {
+    const m = 0.45;
+    return inRoom(x, y) && inRoom(x + m, y) && inRoom(x - m, y) && inRoom(x, y + m) && inRoom(x, y - m);
+  };
+
+  function classify(x, y) {
+    if (y < -H) return 'upperDome';
+    if (y > H) return 'lowerDome';
+    if (Math.abs(x) >= C) return y < 0 ? (x < 0 ? 'pocketUL' : 'pocketUR') : (x < 0 ? 'pocketLL' : 'pocketLR');
+    return 'center';
+  }
+  const family = r => (r === 'pocketUL' || r === 'pocketUR') ? 'upperPocket'
+    : (r === 'pocketLL' || r === 'pocketLR') ? 'lowerPocket' : r;
+
+  const NAMES = { center: '中央区', upperDome: '上穹顶', lowerDome: '下穹顶', pocketUL: '左上侧袋', pocketUR: '右上侧袋', pocketLL: '左下侧袋', pocketLR: '右下侧袋' };
+  const DARK = {
+    center: ['pocketUL', 'pocketUR', 'pocketLL', 'pocketLR'],
+    upperDome: ['pocketLL', 'pocketLR'],
+    lowerDome: ['pocketUL', 'pocketUR'],
+    upperPocket: ['center', 'lowerDome', 'pocketLL', 'pocketLR'],
+    lowerPocket: ['center', 'upperDome', 'pocketUL', 'pocketUR'],
+  };
+  const SUMMARY = {
+    center: '四个侧袋', upperDome: '下方两个侧袋', lowerDome: '上方两个侧袋',
+    upperPocket: '中央区、下穹顶和下方两个侧袋', lowerPocket: '中央区、上穹顶和上方两个侧袋',
+  };
+  const WHY = {
+    center: '光源夹在上下两对焦点之间。射进穹顶的光都从两焦点之间穿过，反射回来仍从两焦点之间穿过，所以永远进不了四个侧袋。',
+    upperDome: '光能直接照进中央区和上方两个侧袋。但光要从中央区进入下穹顶，只能穿过下方两焦点之间，反射后又回到中央区，下方两个侧袋始终照不到。',
+    lowerDome: '光能直接照进中央区和下方两个侧袋。但光要从中央区进入上穹顶，只能穿过上方两焦点之间，反射后又回到中央区，上方两个侧袋始终照不到。',
+    upperPocket: '光源在焦点外侧。它射进上穹顶的光反射后仍落在焦点外侧，只能在上方两个侧袋之间来回，中央区、下穹顶和下方两个侧袋都照不到。',
+    lowerPocket: '光源在焦点外侧。它射进下穹顶的光反射后仍落在焦点外侧，只能在下方两个侧袋之间来回，中央区、上穹顶和上方两个侧袋都照不到。',
+  };
+  const areaOf = r => r === 'center' ? AREA.center : (r === 'upperDome' || r === 'lowerDome') ? AREA.dome : AREA.pocket;
+
+  // ---------------- 路径 ----------------
+  const roomPath = new Path2D();
+  roomPath.moveTo(-A, -H);
+  roomPath.ellipse(0, -H, A, B, 0, Math.PI, 2 * Math.PI);
+  roomPath.lineTo(A, -STEM); roomPath.lineTo(C, -STEM); roomPath.lineTo(C, -H);
+  roomPath.ellipse(C, 0, SX, SY, 0, -Math.PI / 2, Math.PI / 2, true);
+  roomPath.lineTo(C, STEM); roomPath.lineTo(A, STEM); roomPath.lineTo(A, H);
+  roomPath.ellipse(0, H, A, B, 0, 0, Math.PI);
+  roomPath.lineTo(-A, STEM); roomPath.lineTo(-C, STEM); roomPath.lineTo(-C, H);
+  roomPath.ellipse(-C, 0, SX, SY, 0, Math.PI / 2, -Math.PI / 2, true);
+  roomPath.lineTo(-C, -STEM); roomPath.lineTo(-A, -STEM);
+  roomPath.closePath();
+
+  const regionPath = {};
+  for (const [name, sx, sy] of [['pocketUL', -1, -1], ['pocketUR', 1, -1], ['pocketLL', -1, 1], ['pocketLR', 1, 1]]) {
+    const p = new Path2D();
+    const x0 = Math.min(sx * C, sx * A), y0 = Math.min(sy * STEM, sy * H);
+    p.rect(x0, y0, A - C, H - STEM);
+    regionPath[name] = p;
+  }
+  {
+    const p = new Path2D();
+    p.moveTo(-C, -H); p.lineTo(C, -H);
+    p.ellipse(C, 0, SX, SY, 0, -Math.PI / 2, Math.PI / 2, true);
+    p.lineTo(-C, H);
+    p.ellipse(-C, 0, SX, SY, 0, Math.PI / 2, -Math.PI / 2, true);
+    p.closePath();
+    regionPath.center = p;
+    const u = new Path2D(); u.moveTo(-A, -H); u.ellipse(0, -H, A, B, 0, Math.PI, 2 * Math.PI); u.closePath();
+    regionPath.upperDome = u;
+    const d = new Path2D(); d.moveTo(A, H); d.ellipse(0, H, A, B, 0, 0, Math.PI); d.closePath();
+    regionPath.lowerDome = d;
+  }
+
+  // ---------------- 求交 ----------------
+  let hitT = 0, hitNx = 0, hitNy = 0;
+  function cast(ox, oy, dx, dy) {
+    let best = Infinity, bnx = 0, bny = 0;
+    for (let w = 0; w < walls.length; w++) {
+      const W = walls[w];
+      if (W.k === 0) {
+        const ex = W.x2 - W.x1, ey = W.y2 - W.y1;
+        const den = dx * ey - dy * ex;
+        if (den > -1e-12 && den < 1e-12) continue;
+        const qx = W.x1 - ox, qy = W.y1 - oy;
+        const t = (qx * ey - qy * ex) / den;
+        if (t <= EPS || t >= best) continue;
+        const u = (qx * dy - qy * dx) / den;
+        if (u < -1e-9 || u > 1 + 1e-9) continue;
+        best = t; bnx = -ey; bny = ex;
+      } else {
+        const X = (ox - W.cx) / W.rx, Y = (oy - W.cy) / W.ry, DX = dx / W.rx, DY = dy / W.ry;
+        const a = DX * DX + DY * DY, b = 2 * (X * DX + Y * DY), c = X * X + Y * Y - 1;
+        const disc = b * b - 4 * a * c;
+        if (disc < 0) continue;
+        const sq = Math.sqrt(disc);
+        for (let s = -1; s <= 1; s += 2) {
+          const t = (-b + s * sq) / (2 * a);
+          if (t <= EPS || t >= best) continue;
+          const px = ox + dx * t, py = oy + dy * t;
+          const side = W.axisY ? (py - W.cy) * W.sign : (px - W.cx) * W.sign;
+          if (side < -1e-9) continue;
+          best = t; bnx = (px - W.cx) / (W.rx * W.rx); bny = (py - W.cy) / (W.ry * W.ry);
+        }
+      }
+    }
+    if (best === Infinity) return false;
+    hitT = best; hitNx = bnx; hitNy = bny;
+    return true;
+  }
+
+  // ---------------- 状态 ----------------
+  const $ = id => document.getElementById(id);
+  const view = $('view'), vctx = view.getContext('2d');
+  const stage = $('stage'), frameEl = $('frame'), hintEl = $('hint');
+  const rootStyle = getComputedStyle(document.documentElement);
+  const tok = n => rootStyle.getPropertyValue(n).trim();
+  const hex = h => { const v = parseInt(h.replace('#', ''), 16); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
+  const COL = { mirror: tok('--mirror'), lamp: tok('--lamp'), spark: tok('--spark'), focus: tok('--focus'), shade: tok('--shade') };
+  const FLOOR = hex(tok('--floor'));
+  const LAMP = hex(COL.lamp), SPARK = hex(COL.spark);
+  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+  let N = 1800;
+  let source = null, region = 'center';
+  let D = 0, paused = false, speed = 1;
+  let turbo = false, turboTarget = 0;
+  let showFoci = true, showTheory = false, showHeads = true;
+  let needsTone = true, needsRender = true;
+  let litFrac = 0;
+  let rx, ry, rdx, rdy, rnx, rny, rD0, rLen, rB, rAlive;
+
+  function initRays() {
+    rx = new Float64Array(N); ry = new Float64Array(N); rdx = new Float64Array(N); rdy = new Float64Array(N);
+    rnx = new Float64Array(N); rny = new Float64Array(N); rD0 = new Float64Array(N); rLen = new Float64Array(N);
+    rB = new Uint32Array(N); rAlive = new Uint8Array(N);
+    for (let i = 0; i < N; i++) {
+      const a = (i + 0.5) / N * 2 * Math.PI + 0.000731;
+      rx[i] = source.x; ry[i] = source.y; rdx[i] = Math.cos(a); rdy[i] = Math.sin(a);
+      nextSeg(i);
+    }
+  }
+  function nextSeg(i) {
+    if (cast(rx[i], ry[i], rdx[i], rdy[i])) {
+      rLen[i] = hitT; rnx[i] = hitNx; rny[i] = hitNy;
+      // 角点处的数值误差可能让光线从缝里漏出去：检查新线段的中点，漏出的光线直接作废
+      const mx = rx[i] + rdx[i] * hitT * 0.5, my = ry[i] + rdy[i] * hitT * 0.5;
+      rAlive[i] = inRoom(mx, my) ? 1 : 0;
+    } else {
+      rAlive[i] = 0;
+    }
+  }
+
+  function advanceRay(i, d0, Dn) {
+    for (let guard = 0; guard < 4096; guard++) {
+      const base = rD0[i], len = rLen[i], sx = rx[i], sy = ry[i], dx = rdx[i], dy = rdy[i];
+      const a = d0 - base;
+      if (Dn <= base + len) {
+        const b = Dn - base;
+        deposit(sx + dx * a, sy + dy * a, sx + dx * b, sy + dy * b);
+        return;
+      }
+      const ex = sx + dx * len, ey = sy + dy * len;
+      deposit(sx + dx * a, sy + dy * a, ex, ey);
+      let nx = rnx[i], ny = rny[i];
+      const nl = Math.hypot(nx, ny); nx /= nl; ny /= nl;
+      const dot = dx * nx + dy * ny;
+      let ndx = dx - 2 * dot * nx, ndy = dy - 2 * dot * ny;
+      const dl = Math.hypot(ndx, ndy); ndx /= dl; ndy /= dl;
+      rx[i] = ex; ry[i] = ey; rdx[i] = ndx; rdy[i] = ndy;
+      rD0[i] = base + len; rB[i]++;
+      d0 = base + len;
+      nextSeg(i);
+      if (!rAlive[i]) return;
+    }
+  }
+  function advanceTo(Dn) {
+    const Dp = D;
+    for (let i = 0; i < N; i++) if (rAlive[i]) advanceRay(i, Dp, Dn);
+    D = Dn;
+  }
+
+  // ---------------- 光照累积缓冲 ----------------
+  let cssW = 0, cssH = 0, dpr = 1, vs = 1;
+  let bw = 0, bh = 0, bs = 1, acc = null, img = null, lightCanvas = null, lctx = null;
+  let inside = null, floorRGB = null, gain = 1, hatch = null;
+  const TARGET = 1.4;
+
+  function deposit(x0, y0, x1, y1) {
+    const ax = (x0 - WX0) * bs - 0.5, ay = (y0 - WY0) * bs - 0.5;
+    const ddx = (x1 - x0) * bs, ddy = (y1 - y0) * bs;
+    const len = Math.sqrt(ddx * ddx + ddy * ddy);
+    if (len < 1e-6) return;
+    const n = Math.ceil(len / 0.7), w = len / n, sx = ddx / n, sy = ddy / n;
+    let px = ax + sx * 0.5, py = ay + sy * 0.5;
+    const maxX = bw - 1, maxY = bh - 1;
+    for (let i = 0; i < n; i++, px += sx, py += sy) {
+      const ix = Math.floor(px), iy = Math.floor(py);
+      if (ix < 0 || iy < 0 || ix >= maxX || iy >= maxY) continue;
+      const fx = px - ix, fy = py - iy, o = iy * bw + ix;
+      const w11 = fx * fy * w, w10 = fx * w - w11, w01 = fy * w - w11;
+      acc[o] += w - w10 - w01 - w11; acc[o + 1] += w10; acc[o + bw] += w01; acc[o + bw + 1] += w11;
+    }
+  }
+
+  // 光学深度 τ → 叠加到地面上的颜色（长曝光照片式的色调映射）
+  const LUT_N = 2048, TAU_MAX = 7, LUT_K = LUT_N / TAU_MAX;
+  const LUT = new Float32Array(LUT_N * 3);
+  {
+    const stops = [[0, [0, 0, 0]], [0.22, [96, 40, 6]], [0.5, [214, 112, 24]], [0.78, LAMP], [1, [SPARK[0] - 20, SPARK[1] - 20, SPARK[2] - 25]]];
+    for (let i = 0; i < LUT_N; i++) {
+      const tau = i / LUT_K, v = Math.pow(1 - Math.exp(-tau), 0.55);
+      let j = 0; while (j < stops.length - 2 && v > stops[j + 1][0]) j++;
+      const [t0, c0] = stops[j], [t1, c1] = stops[j + 1], f = Math.min(1, Math.max(0, (v - t0) / (t1 - t0)));
+      for (let k = 0; k < 3; k++) LUT[i * 3 + k] = c0[k] + (c1[k] - c0[k]) * f;
+    }
+  }
+
+  function computeGain() { gain = TARGET * AREA.total * bs / (N * L_MAX); }
+
+  function setupBuffer() {
+    let sc = Math.min(dpr, 1.5);
+    if (cssW * cssH * sc * sc > 1.4e6) sc = Math.sqrt(1.4e6 / (cssW * cssH));
+    bw = Math.max(4, Math.round(cssW * sc)); bh = Math.max(4, Math.round(cssH * sc));
+    bs = bw / WW;
+    acc = new Float32Array(bw * bh);
+    lightCanvas = document.createElement('canvas'); lightCanvas.width = bw; lightCanvas.height = bh;
+    lctx = lightCanvas.getContext('2d');
+    lctx.setTransform(bs, 0, 0, bs, -WX0 * bs, -WY0 * bs);
+    lctx.fillStyle = '#fff'; lctx.fill(roomPath);
+    lctx.setTransform(1, 0, 0, 1, 0, 0);
+    const md = lctx.getImageData(0, 0, bw, bh).data;
+    let count = 0;
+    for (let p = 0; p < bw * bh; p++) if (md[p * 4 + 3] > 127) count++;
+    inside = new Int32Array(count); floorRGB = new Uint8Array(count * 3);
+    img = lctx.createImageData(bw, bh);
+    const data = img.data, grid = 10, gw = 0.55;
+    let k = 0;
+    for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) {
+      const p = y * bw + x;
+      if (md[p * 4 + 3] <= 127) continue;
+      inside[k] = p;
+      const wx = WX0 + (x + 0.5) / bs, wy = WY0 + (y + 0.5) / bs;
+      const gx = Math.abs(wx / grid - Math.round(wx / grid)) * grid * bs;
+      const gy = Math.abs(wy / grid - Math.round(wy / grid)) * grid * bs;
+      const line = (gx < gw || gy < gw) ? 6 : 0;
+      floorRGB[k * 3] = FLOOR[0] + line; floorRGB[k * 3 + 1] = FLOOR[1] + line; floorRGB[k * 3 + 2] = FLOOR[2] + line + 2;
+      data[p * 4 + 3] = 255;
+      k++;
+    }
+    computeGain();
+    makeHatch();
+  }
+
+  function tonemap() {
+    const data = img.data, g = gain * LUT_K, top = LUT_N - 1;
+    let lit = 0;
+    for (let k = 0, n = inside.length; k < n; k++) {
+      const p = inside[k], a = acc[p], o = p << 2, f = k * 3;
+      if (a > 0.02) {
+        lit++;
+        let idx = (a * g) | 0; if (idx > top) idx = top;
+        const q = idx * 3;
+        data[o] = floorRGB[f] + LUT[q]; data[o + 1] = floorRGB[f + 1] + LUT[q + 1]; data[o + 2] = floorRGB[f + 2] + LUT[q + 2];
+      } else {
+        data[o] = floorRGB[f]; data[o + 1] = floorRGB[f + 1]; data[o + 2] = floorRGB[f + 2];
+      }
+    }
+    litFrac = inside.length ? lit / inside.length : 0;
+    lctx.putImageData(img, 0, 0);
+  }
+
+  function makeHatch() {
+    const s = Math.max(6, Math.round(7 * dpr));
+    const pc = document.createElement('canvas'); pc.width = pc.height = s;
+    const p = pc.getContext('2d');
+    p.strokeStyle = COL.shade; p.globalAlpha = 0.6; p.lineWidth = Math.max(1, dpr);
+    p.beginPath();
+    p.moveTo(0, s); p.lineTo(s, 0);
+    p.moveTo(-1, 1); p.lineTo(1, -1);
+    p.moveTo(s - 1, s + 1); p.lineTo(s + 1, s - 1);
+    p.stroke();
+    hatch = vctx.createPattern(pc, 'repeat');
+    if (hatch && hatch.setTransform && typeof DOMMatrix !== 'undefined') hatch.setTransform(new DOMMatrix([1 / vs, 0, 0, 1 / vs, 0, 0]));
+  }
+
+  // ---------------- 绘制 ----------------
+  function render() {
+    const c = vctx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, view.width, view.height);
+    c.imageSmoothingEnabled = true;
+    c.drawImage(lightCanvas, 0, 0, view.width, view.height);
+    c.setTransform(vs, 0, 0, vs, -WX0 * vs, -WY0 * vs);
+    const px = dpr / vs; // 一个 CSS 像素对应的世界长度
+
+    if (showTheory && source) {
+      for (const r of DARK[family(region)]) {
+        c.fillStyle = hatch || rgba(hex(COL.shade), 0.25);
+        c.fill(regionPath[r]);
+        c.save(); c.setLineDash([4 * px, 3 * px]); c.strokeStyle = COL.shade; c.globalAlpha = 0.9; c.lineWidth = 1 * px;
+        c.stroke(regionPath[r]); c.restore();
+      }
+    }
+
+    if (showFoci) {
+      c.save();
+      c.strokeStyle = COL.focus; c.lineWidth = 1 * px;
+      c.globalAlpha = 0.5; c.setLineDash([3 * px, 4 * px]);
+      c.beginPath();
+      for (const y of [-H, H]) { c.moveTo(-A, y); c.lineTo(A, y); }
+      c.stroke();
+      c.setLineDash([]); c.globalAlpha = 1; c.lineWidth = 1.6 * px;
+      const s = 4.5 * px;
+      c.beginPath();
+      for (const y of [-H, H]) for (const x of [-C, C]) { c.moveTo(x - s, y); c.lineTo(x + s, y); c.moveTo(x, y - s); c.lineTo(x, y + s); }
+      c.stroke();
+      c.restore();
+    }
+
+    if (showHeads && source && D < L_MAX && !turbo) {
+      const s = 1.7 * px;
+      c.fillStyle = COL.spark; c.globalAlpha = N > 2000 ? 0.7 : 0.9;
+      c.beginPath();
+      for (let i = 0; i < N; i++) {
+        if (!rAlive[i]) continue;
+        const t = D - rD0[i];
+        c.rect(rx[i] + rdx[i] * t - s / 2, ry[i] + rdy[i] * t - s / 2, s, s);
+      }
+      c.fill();
+      c.globalAlpha = 1;
+    }
+
+    c.lineJoin = 'round'; c.lineCap = 'round'; c.strokeStyle = COL.mirror;
+    c.globalAlpha = 0.16; c.lineWidth = 5 * px; c.stroke(roomPath);
+    c.globalAlpha = 1; c.lineWidth = 1.6 * px; c.stroke(roomPath);
+
+    if (source) {
+      const { x, y } = source, R = 16 * px;
+      const g = c.createRadialGradient(x, y, 0, x, y, R);
+      g.addColorStop(0, rgba(SPARK, 0.95)); g.addColorStop(0.3, rgba(LAMP, 0.45)); g.addColorStop(1, rgba(LAMP, 0));
+      c.fillStyle = g; c.beginPath(); c.arc(x, y, R, 0, Math.PI * 2); c.fill();
+      c.fillStyle = COL.spark; c.beginPath(); c.arc(x, y, 3.2 * px, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = COL.lamp; c.lineWidth = 1.2 * px; c.beginPath(); c.arc(x, y, 6.5 * px, 0, Math.PI * 2); c.stroke();
+    }
+  }
+
+  // ---------------- 布局 ----------------
+  const FRAME_PAD = 22;
+  const narrow = window.matchMedia('(max-width: 880px)');
+  function layout() {
+    const aspect = WH / WW;
+    let w = Math.max(240, stage.clientWidth - FRAME_PAD);
+    let h = w * aspect;
+    if (!narrow.matches) {
+      const frameTop = frameEl.getBoundingClientRect().top + window.scrollY;
+      const maxH = Math.max(340, window.innerHeight - frameTop - FRAME_PAD - 20);
+      if (h > maxH) { h = maxH; w = h / aspect; }
+    }
+    w = Math.floor(w); h = Math.round(w * aspect);
+    const ndpr = window.devicePixelRatio || 1;
+    if (w === cssW && h === cssH && ndpr === dpr && lightCanvas) return;
+    cssW = w; cssH = h; dpr = ndpr;
+    view.style.width = w + 'px'; view.style.height = h + 'px';
+    view.width = Math.round(w * dpr); view.height = Math.round(h * dpr);
+    vs = view.width / WW;
+    setupBuffer();
+    if (source) {
+      const target = D;
+      resetSim();
+      if (target > 0) { turbo = true; turboTarget = target; }
+    }
+    needsTone = true; needsRender = true;
+  }
+
+  function resetSim() {
+    acc.fill(0); D = 0; litFrac = 0;
+    initRays();
+    needsTone = true; needsRender = true;
+  }
+
+  // ---------------- 交互 ----------------
+  const fmt = v => (Math.abs(v) < 0.05 ? 0 : v).toFixed(1).replace('-', '−');
+  function placeSource(x, y) {
+    source = { x, y };
+    region = classify(x, y);
+    paused = false; turbo = false;
+    resetSim();
+    const fam = family(region);
+    const darkArea = DARK[fam].reduce((s, r) => s + areaOf(r), 0);
+    const maxLit = 1 - darkArea / AREA.total;
+    $('regionName').textContent = NAMES[region];
+    $('coords').textContent = `(${fmt(x)}, ${fmt(-y)})`;
+    $('darkSummary').textContent = `${SUMMARY[fam]}（约占 ${(darkArea / AREA.total * 100).toFixed(1)}%）`;
+    $('whyNow').textContent = WHY[fam];
+    $('litMax').textContent = (maxLit * 100).toFixed(1) + '%';
+    $('litCap').style.left = (maxLit * 100) + '%';
+    updateUI();
+  }
+
+  let hintTimer = 0, touched = false;
+  function flashHint(text) {
+    hintEl.hidden = false; hintEl.textContent = text; hintEl.classList.add('warn');
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(() => { hintEl.classList.remove('warn'); hintEl.hidden = touched; }, 1600);
+  }
+
+  function toWorld(ev) {
+    const r = view.getBoundingClientRect();
+    return { x: WX0 + (ev.clientX - r.left) / r.width * WW, y: WY0 + (ev.clientY - r.top) / r.height * WH };
+  }
+  let dragging = false, pendingDrag = null;
+  view.addEventListener('pointerdown', ev => {
+    const p = toWorld(ev);
+    if (!canPlace(p.x, p.y)) { flashHint('请点在亮线围起来的房间内部'); return; }
+    ev.preventDefault();
+    dragging = true;
+    try { view.setPointerCapture(ev.pointerId); } catch (e) { /* 部分环境不支持 */ }
+    touched = true; hintEl.hidden = true;
+    placeSource(p.x, p.y);
+  });
+  view.addEventListener('pointermove', ev => {
+    const p = toWorld(ev), ok = canPlace(p.x, p.y);
+    view.classList.toggle('outside', !ok);
+    if (dragging && ok) pendingDrag = p;
+  });
+  const endDrag = () => { dragging = false; };
+  view.addEventListener('pointerup', endDrag);
+  view.addEventListener('pointercancel', endDrag);
+  view.addEventListener('pointerleave', () => view.classList.remove('outside'));
+
+  const speedEl = $('speed'), speedOut = $('speedOut');
+  const onSpeed = () => { speed = parseFloat(speedEl.value) || 0; speedOut.textContent = speed.toFixed(2) + '×'; updateUI(); };
+  speedEl.addEventListener('input', onSpeed);
+
+  const pauseBtn = $('pauseBtn'), skipBtn = $('skipBtn');
+  function togglePause() { if (D >= L_MAX) return; paused = !paused; updateUI(); }
+  pauseBtn.addEventListener('click', togglePause);
+  $('replayBtn').addEventListener('click', () => { if (source) placeSource(source.x, source.y); });
+  skipBtn.addEventListener('click', () => { if (!source || D >= L_MAX) return; turbo = true; turboTarget = L_MAX; updateUI(); });
+
+  document.querySelectorAll('input[name="rays"]').forEach(el => el.addEventListener('change', () => {
+    N = parseInt(el.value, 10); computeGain();
+    if (source) placeSource(source.x, source.y);
+  }));
+  document.querySelectorAll('.presets .btn').forEach(el => el.addEventListener('click', () => {
+    touched = true; hintEl.hidden = true;
+    placeSource(parseFloat(el.dataset.x), parseFloat(el.dataset.y));
+  }));
+  $('showFoci').addEventListener('change', e => { showFoci = e.target.checked; needsRender = true; });
+  $('showTheory').addEventListener('change', e => { showTheory = e.target.checked; needsRender = true; });
+  $('showHeads').addEventListener('change', e => { showHeads = e.target.checked; needsRender = true; });
+
+  document.addEventListener('keydown', e => {
+    if (e.code !== 'Space') return;
+    if (e.target.closest && e.target.closest('input,button,select,textarea,a')) return;
+    e.preventDefault(); togglePause();
+  });
+
+  // ---------------- 读数 ----------------
+  const statusEl = $('status');
+  function updateUI() {
+    $('pathText').textContent = `${Math.round(D)} / ${L_MAX}`;
+    $('pathBar').style.width = (D / L_MAX * 100) + '%';
+    $('litNow').textContent = (litFrac * 100).toFixed(1) + '%';
+    $('litBar').style.width = (litFrac * 100) + '%';
+    if (rB) { let s = 0; for (let i = 0; i < N; i++) s += rB[i]; $('bounces').textContent = (s / N).toFixed(1); }
+    const done = D >= L_MAX;
+    let state = 'run', text = '运行中';
+    if (turbo) { text = '计算中…'; }
+    else if (done) { state = 'done'; text = '已完成'; }
+    else if (paused) { state = 'idle'; text = '已暂停'; }
+    else if (speed === 0) { state = 'idle'; text = '速度为 0'; }
+    statusEl.dataset.state = state; statusEl.textContent = text;
+    pauseBtn.textContent = paused ? '继续' : '暂停';
+    pauseBtn.disabled = done || turbo;
+    skipBtn.disabled = done || turbo || !source;
+  }
+
+  // ---------------- 主循环 ----------------
+  let last = performance.now(), lastUI = 0;
+  function tick(now) {
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+    if (pendingDrag) { placeSource(pendingDrag.x, pendingDrag.y); pendingDrag = null; }
+    if (source) {
+      if (turbo) {
+        const t0 = performance.now();
+        while (D < turboTarget && performance.now() - t0 < 20) advanceTo(Math.min(turboTarget, D + 12));
+        if (D >= turboTarget) turbo = false;
+        needsTone = true;
+      } else if (!paused && speed > 0 && D < L_MAX) {
+        advanceTo(Math.min(L_MAX, D + speed * BASE_SPEED * dt));
+        needsTone = true;
+      }
+    }
+    if (needsTone) { tonemap(); needsTone = false; needsRender = true; }
+    if (needsRender) { render(); needsRender = false; }
+    if (now - lastUI > 100) { updateUI(); lastUI = now; }
+    requestAnimationFrame(tick);
+  }
+
+  let layoutQueued = false;
+  const queueLayout = () => { if (layoutQueued) return; layoutQueued = true; requestAnimationFrame(() => { layoutQueued = false; layout(); }); };
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(queueLayout).observe(stage);
+  window.addEventListener('resize', queueLayout);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueLayout);
+
+  layout();
+  placeSource(-14, 4);
+  requestAnimationFrame(tick);
+})();
+</script>
+
+</body>
+</html>
